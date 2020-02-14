@@ -1,0 +1,12 @@
+<launch>
+  <!-- Listen to messages from joysicks -->
+  <!-- <node pkg="joy" name="joy_node" type="joy_node"/> -->
+
+  <!-- <node pkg="mpnet_plan" type="mpnet_plan_node" respawn="false" name="mpnet_local_planner" output="screen" launch-prefix="xterm -e gdb run"> -->
+  <node pkg="mpnet_plan" type="mpnet_plan_node" respawn="false" name="mpnet_local_planner" output="screen">
+    <rosparam file="$(find rrt_global_planner)/params/costmap_common_config.yaml" command="load" ns="global_costmap" /> 
+    <rosparam file="$(find rrt_global_planner)/params/costmap_common_config.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find racecar_simulator)/params/local_costmap_param.yaml" command="load" />
+    <rosparam file="$(find racecar_simulator)/params/global_costmap_param.yaml" command="load" /> 
+  </node>
+</launch>
