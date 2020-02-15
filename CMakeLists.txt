@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
-# cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-# project(custom_ops)
+set(TORCH_LIB "/root/data/")
 
-
-list(APPEND CMAKE_PREFIX_PATH "/root/data/libtorch")
+list(APPEND CMAKE_PREFIX_PATH "${TORCH_LIB}libtorch")
 find_package(Torch REQUIRED)
 
 
@@ -18,6 +16,7 @@ project(mpnet_plan)
 find_package(catkin REQUIRED COMPONENTS
   costmap_2d
   base_local_planner
+  nav_core
   roscpp
   tf2
   tf2_geometry_msgs
@@ -130,6 +129,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 include_directories(
   include
+  ${TORCH_LIB}libtorch/include
   ${catkin_INCLUDE_DIRS}
 )
 
