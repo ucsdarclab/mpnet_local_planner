@@ -95,15 +95,14 @@ namespace mpnet_local_planner{
         return input_vector;
     }
 
+    std::vector<double> MpnetPlanner::getMapPoint(torch::Tensor target_state, std::vector<double> bounds, double origin_x, double origin_y)
+    {
+        auto tensor_a = target_state.accessor<float,2>();
+        std::vector<double> pose{(tensor_a[0][0]+1)*bounds[0]/2 + origin_x, (tensor_a[0][1]+1)*bounds[1]/2 + origin_y,tensor_a[0][2]*bounds[2]};
+        return pose;
+    }
 }
 
-
-std::vector<double> getMapPoint(torch::Tensor target_state, std::vector<double> bounds, double origin_x, double origin_y)
-{
-    auto tensor_a = target_state.accessor<float,2>();
-    std::vector<double> pose{(tensor_a[0][0]+1)*bounds[0]/2 + origin_x, (tensor_a[0][1]+1)*bounds[1]/2 + origin_y,tensor_a[0][2]*bounds[2]};
-    return pose;
-}
 
 int main(int argc,char* argv[]) {
 
@@ -268,7 +267,7 @@ int main(int argc,char* argv[]) {
         // Execute the model and turn its output into a tensor.
         at::Tensor output = module.forward(inputs).toTensor();
         // std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/3) << '\n';
-        targetPose = getMapPoint(output, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
+        targetPose = pgetMapPoint(output, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
         // Display the point on the map
         targetPoint.header.frame_id = "/map";
         targetPoint.pose.pose.position.x = targetPose[0];
