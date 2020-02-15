@@ -1,66 +1,51 @@
-/** 
- * Defines the class for mpnet local planner
+/**
+ * The core of the planner
  */
-#include <memory>
 
-#include <geometry_msgs/PoseStamped.h>
-#include <geometry_msgs/Twist.h>
+#include <torch/script.h>
 
-#include <tf2_ros/buffer.h>
-
-#include <costmap_2d/costmap_2d_ros.h>
 #include <costmap_2d/costmap_2d.h>
 
-#include <base_local_planner/world_model.h>
-#include <base_local_planner/costmap_model.h>
+#include <ompl/base/spaces/DubinsStateSpace.h>
+#include <ompl/base/ScopedState.h>
+#include <ompl/geometric/SimpleSetup.h>
+
+namespace ob = ompl::base;
+namespace og = ompl::geometric;
+
 
 namespace mpnet_local_planner{
-
-    class MpnetLocalPlanner{
-        /**
-         * @class MpnetLocalPlanner
-         * @brief Provides an interface for the mpnet local planner, with a model precitive controller
-         */
+    class MpnetPlanner{
 
         public:
-            tf2_ros::Buffer* tf_;
-            costmap_2d::Costmap2DROS* navigation_costmap_ros_;
-            costmap_2d::Costmap2D* costmap_;
-            base_local_planner::WorldModel* world_model_;
-            bool initialized_;
+        MpnetPlanner();
 
-            /**
-             * @brief Compute the velocity commmand to send to the base
-             */
-            bool computeVelocityCommands(geometry_msgs::Twist& cmd_vel);
+        ~MpnetPlanner();
 
-            /**
-             * @brief Check if the goal pose has been achieved by the local planner
-             */
-            bool isGoalReach();
-            
-            /**
-             * @brief Set the plan that the local planner is following
-             * @param plan The plan to pass to the local planner
-             * @return True if the plan was updated successfully, false otherwise
-             */
-            bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan);
+        /**
+         * @brief A function to copy the costmap and pad it with zeros such that the robot is in the center
+         * @param x The x co-ordinate of the robot
+         * @param y The y co-ordinate of the robot
+         * @param resolution The resolution of the costmap
+         * @param origin_x The x co-ordinate of the costmap origin
+         * @param origin_y The y co-ordinate of the costmap origin
+         * @param costmap A pointer to the local costmap
+         */
+        torch::Tensor copy_costmap( double x, double y, double resolution, double origin_x, double origin_y, costmap_2d::Costmap2D* costmap);
 
-            /**
-             * @brief Constructs the local planner
-             * @param name The name given to this instance of the local planner
-             * @param tf A pointer to a transform listener
-             * @param costmap_ros The costmap map to use for assigning costs to local plans
-             */
-            void initialize(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros);
-
-            /**
-             * Destructor for the interface
-             */
-            ~MpnetLocalPlanner();
-
-        private:
-            MpnetLocalPlanner();
+        /**
+         * @brief A function that returns the input tensor given the current and goal position of the robot
+         * @param start The starting position of the robot
+         * @param goal The goal position the robot has to achieve
+         * @param bounds The bounds of the robot
+         * @param origin_x The x co-ordinate of the costmap origin
+         * @param origin_y The y co-ordinate of the costmap origin
+         */
+        torch::Tensor copy_pose(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds, double origin_x, double origin_y);
         
+        
+        private:
+        static char* cost_translation_table;
+
     };
 }
