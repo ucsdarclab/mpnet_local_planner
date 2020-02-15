@@ -1,4 +1,3 @@
-#include <torch/script.h> // One-stop header.
 #include <csignal>
 #include <typeinfo>
 #include <iostream>
@@ -8,9 +7,6 @@
 #include <base_local_planner/world_model.h>
 #include <base_local_planner/costmap_model.h>
 
-#include <ompl/base/spaces/DubinsStateSpace.h>
-#include <ompl/base/ScopedState.h>
-#include <ompl/geometric/SimpleSetup.h>
 
 #include <tf2_ros/transform_listener.h>
 #include <tf2_ros/buffer.h>
@@ -18,79 +14,89 @@
 
 
 #include <costmap_2d/costmap_2d_ros.h>
-#include <costmap_2d/costmap_2d.h>
 
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 
-namespace ob = ompl::base;
-namespace og = ompl::geometric;
+#include <mpnet_plan.h>
 
-
-
-torch::Tensor copy_costmap(double x, double y, double resolution, double origin_x, double origin_y,costmap_2d::Costmap2D* costmap)
-{
-    torch::Tensor costmap_egocentric = torch::full({1,1,80,80}, 1);
-
-    // FOR COSTMAP GENERATION and COLLISION CHECKER
-    char* cost_translation_table = new char[256];
-
-    // special values:
-    cost_translation_table[0] = 0;  // NO obstacle
-    cost_translation_table[253] = 99;  // INSCRIBED obstacle
-    cost_translation_table[254] = 100;  // LETHAL obstacle
-    cost_translation_table[255] = -1;  // UNKNOWN
-
-    // regular cost values scale the range 1 to 252 (inclusive) to fit
-    // into 1 to 98 (inclusive).
-    for (int i = 1; i < 253; i++)
-    {
-        cost_translation_table[ i ] = char(1 + (97 * (i - 1)) / 251);
-    }
-
-    int64_t mx = (int64_t)((x-origin_x)/resolution);
-    int64_t my = (int64_t)((y-origin_y)/resolution);
-    int64_t start_x = 120-mx;
-    int64_t start_y = 120-my;
-
-    int64_t skip_x = 0 ? start_x%3==0 : 3-start_x%3;
-    int64_t skip_y = 0 ? start_y%3==0 : 3-start_y%3;
+namespace mpnet_local_planner{
     
-    int64_t start_shrunk_x = (start_x + skip_x)/3;
-    int64_t start_shrunk_y = (start_y + skip_y)/3;
-    auto cm_a = costmap_egocentric.accessor<float,4>();
-    unsigned char* data = costmap->getCharMap();
-    if (data != NULL)
-    {    
-        // Copy costmap data into egocentric costmap
-        for (int64_t i=0, r=skip_y; r < 120; i++, r+=3)
+    char* MpnetPlanner::cost_translation_table=NULL;
+    MpnetPlanner::MpnetPlanner()
+    {
+        if (cost_translation_table==NULL)
         {
-            for (int64_t j=0, c=skip_x; c<120; j++, c+=3)
+            cost_translation_table = new char[256];
+            // special values:
+            cost_translation_table[0] = 0;  // NO obstacle
+            cost_translation_table[253] = 99;  // INSCRIBED obstacle
+            cost_translation_table[254] = 100;  // LETHAL obstacle
+            cost_translation_table[255] = -1;  // UNKNOWN
+
+            // regular cost values scale the range 1 to 252 (inclusive) to fit
+            // into 1 to 98 (inclusive).
+            for (int i = 1; i < 253; i++)
             {
-                // std::cout<< start_shrunk_y+i << " "<< start_shrunk_x + j << std::endl;
-                cm_a[0][0][start_shrunk_y+i][start_shrunk_x +j] = ((float)cost_translation_table[data[c+r*120]])/100;
+                cost_translation_table[ i ] = char(1 + (97 * (i - 1)) / 251);
             }
         }
+
     }
-    return costmap_egocentric;
+    
+    MpnetPlanner::~MpnetPlanner(){}
+
+
+    torch::Tensor MpnetPlanner::copy_costmap(double x, double y, double resolution, double origin_x, double origin_y,costmap_2d::Costmap2D* costmap)
+    {
+        torch::Tensor costmap_egocentric = torch::full({1,1,80,80}, 1);
+
+        // FOR COSTMAP GENERATION
+        int64_t mx = (int64_t)((x-origin_x)/resolution);
+        int64_t my = (int64_t)((y-origin_y)/resolution);
+        int64_t start_x = 120-mx;
+        int64_t start_y = 120-my;
+
+        int64_t skip_x = 0 ? start_x%3==0 : 3-start_x%3;
+        int64_t skip_y = 0 ? start_y%3==0 : 3-start_y%3;
+        
+        int64_t start_shrunk_x = (start_x + skip_x)/3;
+        int64_t start_shrunk_y = (start_y + skip_y)/3;
+        auto cm_a = costmap_egocentric.accessor<float,4>();
+        unsigned char* data = costmap->getCharMap();
+        if (data != NULL)
+        {    
+            // Copy costmap data into egocentric costmap
+            for (int64_t i=0, r=skip_y; r < 120; i++, r+=3)
+            {
+                for (int64_t j=0, c=skip_x; c<120; j++, c+=3)
+                {
+                    // std::cout<< start_shrunk_y+i << " "<< start_shrunk_x + j << std::endl;
+                    cm_a[0][0][start_shrunk_y+i][start_shrunk_x +j] = ((float)cost_translation_table[data[c+r*120]])/100;
+                }
+            }
+        }
+        return costmap_egocentric;
+    }
+
+    torch::Tensor MpnetPlanner::copy_pose(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds, double origin_x, double origin_y)
+    {
+        torch::Tensor input_vector = torch::empty({1,6});
+        
+        auto iv_a = input_vector.accessor<float,2>();
+        
+        input_vector[0][0] = ((start[0]-origin_x)/bounds[0])*2 - 1;
+        input_vector[0][1] = ((start[1]-origin_y)/bounds[1])*2 - 1;
+        input_vector[0][2] = start[2]/bounds[2];
+        input_vector[0][3] = ((goal[0]-origin_x)/bounds[0])*2 - 1 ;
+        input_vector[0][4] = ((goal[1]-origin_y)/bounds[1])*2 - 1 ;
+        input_vector[0][5] = goal[2]/bounds[2];
+
+        return input_vector;
+    }
+
 }
 
-
-torch::Tensor copy_pose(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds, double origin_x, double origin_y)
-{
-    torch::Tensor input_vector = torch::empty({1,6});
-    
-    auto iv_a = input_vector.accessor<float,2>();
-    
-    input_vector[0][0] = ((start[0]-origin_x)/bounds[0])*2 - 1;
-    input_vector[0][1] = ((start[1]-origin_y)/bounds[1])*2 - 1;
-    input_vector[0][2] = start[2]/bounds[2];
-    input_vector[0][3] = ((goal[0]-origin_x)/bounds[0])*2 - 1 ;
-    input_vector[0][4] = ((goal[1]-origin_y)/bounds[1])*2 - 1 ;
-    input_vector[0][5] = goal[2]/bounds[2];
-
-    return input_vector;
-}
 
 std::vector<double> getMapPoint(torch::Tensor target_state, std::vector<double> bounds, double origin_x, double origin_y)
 {
@@ -109,6 +115,7 @@ int main(int argc,char* argv[]) {
 
     nav_msgs::OccupancyGrid grid;
 
+    mpnet_local_planner::MpnetPlanner plan;
     // -- FOR TESTING PURPOSES - setting start and goal location --
 
     ros::Publisher move_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1);
@@ -252,10 +259,10 @@ int main(int argc,char* argv[]) {
         grid.data.resize(grid.info.width * grid.info.height);
         
         // inputs.push_back(torch::ones({1,1,80,80}));
-        torch::Tensor input_vector = copy_pose(mpnet_start, mpnet_goal, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
+        torch::Tensor input_vector = plan.copy_pose(mpnet_start, mpnet_goal, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
         inputs.push_back(input_vector);
 
-        torch::Tensor costmap= copy_costmap(mpnet_start[0], mpnet_start[1], resolution, grid.info.origin.position.x, grid.info.origin.position.y, costmap_);
+        torch::Tensor costmap= plan.copy_costmap(mpnet_start[0], mpnet_start[1], resolution, grid.info.origin.position.x, grid.info.origin.position.y, costmap_);
         inputs.push_back(costmap);
 
         // Execute the model and turn its output into a tensor.
