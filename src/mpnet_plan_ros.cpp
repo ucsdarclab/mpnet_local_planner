@@ -2,8 +2,7 @@
  * Describing different components of the local planner  
 */ 
 
-#include<mpnet_plan.h>
-#include <torch/script.h>
+#include<mpnet_plan_ros.h>
 
 namespace mpnet_local_planner{
 
@@ -30,13 +29,19 @@ namespace mpnet_local_planner{
             navigation_costmap_ros_ = costmap_ros;
             costmap_ = navigation_costmap_ros_->getCostmap();
             tf_ = tf;
+            // TODO: Load network model from reading the parameter file
 
             initialized_ = true;
         }
         else
         {
             ROS_WARN("mpnet_local_planner has already been initialized, doing nothing");
-        }
+        }   
+    }
+
+    bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
+    {
         
     }
+
 }
