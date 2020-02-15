@@ -4,16 +4,8 @@
 #include <memory>
 #include <math.h>
 #include <ros/ros.h>
-#include <base_local_planner/world_model.h>
+
 #include <base_local_planner/costmap_model.h>
-
-
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
-
-#include <costmap_2d/costmap_2d_ros.h>
 
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
@@ -23,33 +15,66 @@
 namespace mpnet_local_planner{
     
     char* MpnetPlanner::cost_translation_table=NULL;
-    MpnetPlanner::MpnetPlanner()
-    {
-        if (cost_translation_table==NULL)
-        {
-            cost_translation_table = new char[256];
-            // special values:
-            cost_translation_table[0] = 0;  // NO obstacle
-            cost_translation_table[253] = 99;  // INSCRIBED obstacle
-            cost_translation_table[254] = 100;  // LETHAL obstacle
-            cost_translation_table[255] = -1;  // UNKNOWN
-
-            // regular cost values scale the range 1 to 252 (inclusive) to fit
-            // into 1 to 98 (inclusive).
-            for (int i = 1; i < 253; i++)
-            {
-                cost_translation_table[ i ] = char(1 + (97 * (i - 1)) / 251);
-            }
-        }
-
-    }
     
-    MpnetPlanner::~MpnetPlanner(){}
+    // MpnetPlanner::MpnetPlanner(){}
+    
+    MpnetPlanner::MpnetPlanner(tf2_ros::Buffer& tf):
+    tf_(tf),
+    navigation_costmap_ros(NULL),
+    costmap_(NULL),
+    world_model(NULL),
+    initialized_(false)
+    {
+        if (~initialized_)
+        {
+            if (cost_translation_table==NULL)
+            {
+                cost_translation_table = new char[256];
+                // special values:
+                cost_translation_table[0] = 0;  // NO obstacle
+                cost_translation_table[253] = 99;  // INSCRIBED obstacle
+                cost_translation_table[254] = 100;  // LETHAL obstacle
+                cost_translation_table[255] = -1;  // UNKNOWN
+
+                // regular cost values scale the range 1 to 252 (inclusive) to fit
+                // into 1 to 98 (inclusive).
+                for (int i = 1; i < 253; i++)
+                {
+                    cost_translation_table[ i ] = char(1 + (97 * (i - 1)) / 251);
+                }
+            }
+
+            navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap", tf_);
+            navigation_costmap_ros -> pause();
+            costmap_ = navigation_costmap_ros->getCostmap();
+            navigation_costmap_ros -> start();
+            initialized_ = true;
+
+            module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
+            module.to(torch::kCPU);
+        }
+        else
+        {
+            ROS_WARN("The core planner ahs already been initialized, doing nothing");
+        }
+    }
+
+    MpnetPlanner::~MpnetPlanner()
+    {
+        if (navigation_costmap_ros!=NULL)
+            delete navigation_costmap_ros;
+    }
 
 
-    torch::Tensor MpnetPlanner::copy_costmap(double x, double y, double resolution, double origin_x, double origin_y,costmap_2d::Costmap2D* costmap)
+    torch::Tensor MpnetPlanner::copy_costmap(double x, double y)
     {
         torch::Tensor costmap_egocentric = torch::full({1,1,80,80}, 1);
+
+        double resolution = costmap_->getResolution();
+        double origin_x, origin_y;
+        costmap_->mapToWorld(0,0,origin_x,origin_y);
+        origin_x = origin_x - resolution/2;
+        origin_y = origin_y - resolution/2;
 
         // FOR COSTMAP GENERATION
         int64_t mx = (int64_t)((x-origin_x)/resolution);
@@ -63,7 +88,7 @@ namespace mpnet_local_planner{
         int64_t start_shrunk_x = (start_x + skip_x)/3;
         int64_t start_shrunk_y = (start_y + skip_y)/3;
         auto cm_a = costmap_egocentric.accessor<float,4>();
-        unsigned char* data = costmap->getCharMap();
+        unsigned char* data = costmap_->getCharMap();
         if (data != NULL)
         {    
             // Copy costmap data into egocentric costmap
@@ -79,11 +104,16 @@ namespace mpnet_local_planner{
         return costmap_egocentric;
     }
 
-    torch::Tensor MpnetPlanner::copy_pose(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds, double origin_x, double origin_y)
+    torch::Tensor MpnetPlanner::copy_pose(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds)
     {
         torch::Tensor input_vector = torch::empty({1,6});
         
         auto iv_a = input_vector.accessor<float,2>();
+        double resolution = costmap_->getResolution();
+        double origin_x, origin_y;
+        costmap_->mapToWorld(0,0,origin_x,origin_y);
+        origin_x = origin_x - resolution/2;
+        origin_y = origin_y - resolution/2;
         
         input_vector[0][0] = ((start[0]-origin_x)/bounds[0])*2 - 1;
         input_vector[0][1] = ((start[1]-origin_y)/bounds[1])*2 - 1;
@@ -95,11 +125,33 @@ namespace mpnet_local_planner{
         return input_vector;
     }
 
-    std::vector<double> MpnetPlanner::getMapPoint(torch::Tensor target_state, std::vector<double> bounds, double origin_x, double origin_y)
+    std::vector<double> MpnetPlanner::getMapPoint(torch::Tensor target_state, std::vector<double> bounds)
     {
         auto tensor_a = target_state.accessor<float,2>();
+        
+        double resolution = costmap_->getResolution();
+        double origin_x, origin_y;
+        costmap_->mapToWorld(0,0,origin_x,origin_y);
+        origin_x = origin_x - resolution/2;
+        origin_y = origin_y - resolution/2;
+
         std::vector<double> pose{(tensor_a[0][0]+1)*bounds[0]/2 + origin_x, (tensor_a[0][1]+1)*bounds[1]/2 + origin_y,tensor_a[0][2]*bounds[2]};
         return pose;
+    }
+
+    std::vector<double> MpnetPlanner::getTargetPoint(const ob::ScopedState<>&start, const ob::ScopedState<> &goal, std::vector<double> bounds)
+    {
+        torch::NoGradGuard no_grad;
+        torch::Tensor input_vector = copy_pose(start, goal, bounds);
+        inputs.push_back(input_vector);
+
+        torch::Tensor costmap = copy_costmap(start[0], start[1]);
+        inputs.push_back(costmap);
+
+        at::Tensor output = module.forward(inputs).toTensor();
+        std::vector<double> targetPoint = getMapPoint(output, bounds);
+        inputs.clear();
+        return targetPoint;
     }
 }
 
@@ -114,7 +166,8 @@ int main(int argc,char* argv[]) {
 
     nav_msgs::OccupancyGrid grid;
 
-    mpnet_local_planner::MpnetPlanner plan;
+    mpnet_local_planner::MpnetPlanner plan(buffer);
+
     // -- FOR TESTING PURPOSES - setting start and goal location --
 
     ros::Publisher move_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1);
@@ -181,10 +234,6 @@ int main(int argc,char* argv[]) {
     ros::spinOnce();
 
     // ^^ FOR TESTING PURPOSES ^^
-    costmap_2d::Costmap2DROS* planner_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap", buffer);
-    planner_costmap_ros -> pause();
-    costmap_2d::Costmap2D* costmap_ = planner_costmap_ros->getCostmap();
-    planner_costmap_ros -> start();
 
     // Get the global costmap for collision checking -- THIS IS A HACK FOR COLLISION CHECKING FOR TIME BEING
     // THE CORRECT SOLUTION WOULD BE TO USE THE LOCAL COSTMAP AND CHECK IF THE PATH GOES OUTSIDE THE BOUNDS
@@ -221,8 +270,8 @@ int main(int argc,char* argv[]) {
     torch::Device device(torch::kCUDA);
 
     // torch::jit::script::Module module = torch::jit::load(argv[1]);
-    torch::jit::script::Module module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
-    module.to(torch::kCPU);
+    // torch::jit::script::Module mode = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
+    // module.to(torch::kCPU);
     std::cout << "ok\n";
     // Create a vector of inputs for current/goal states
     std::vector<torch::jit::IValue> inputs;
@@ -235,39 +284,8 @@ int main(int argc,char* argv[]) {
     bool isStartValid, isGoalValid, isStartGoalValid;
     for(int sample=0;sample<100;sample++)
     {
-        // std::cout << sample << std::endl;
-        torch::NoGradGuard no_grad;        
-        
-        // Get the current costmap
-        double resolution = costmap_->getResolution();
-        grid.header.frame_id = "map";
-        grid.header.stamp = ros::Time::now();
-        grid.info.resolution = resolution;
-        grid.info.width = costmap_->getSizeInCellsX();
-        grid.info.height = costmap_->getSizeInCellsY();
+        targetPose = plan.getTargetPoint(mpnet_start, mpnet_goal, spaceBound);
 
-        double wx, wy;
-        costmap_->mapToWorld(0, 0, wx, wy);
-
-        grid.info.origin.position.x = wx - resolution / 2;
-        grid.info.origin.position.y = wy - resolution / 2;
-        grid.info.origin.position.z = 0.0;
-        grid.info.origin.orientation.w = 1.0;
-        
-
-        grid.data.resize(grid.info.width * grid.info.height);
-        
-        // inputs.push_back(torch::ones({1,1,80,80}));
-        torch::Tensor input_vector = plan.copy_pose(mpnet_start, mpnet_goal, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
-        inputs.push_back(input_vector);
-
-        torch::Tensor costmap= plan.copy_costmap(mpnet_start[0], mpnet_start[1], resolution, grid.info.origin.position.x, grid.info.origin.position.y, costmap_);
-        inputs.push_back(costmap);
-
-        // Execute the model and turn its output into a tensor.
-        at::Tensor output = module.forward(inputs).toTensor();
-        // std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/3) << '\n';
-        targetPose = pgetMapPoint(output, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
         // Display the point on the map
         targetPoint.header.frame_id = "/map";
         targetPoint.pose.pose.position.x = targetPose[0];
@@ -349,11 +367,6 @@ int main(int argc,char* argv[]) {
     if (world_model!=NULL)
         delete world_model;
         
-    if (planner_costmap_ros!=NULL)
-        delete planner_costmap_ros;
-
     if (collision_costmap_ros!=NULL)
         delete collision_costmap_ros;
-    // TODO: Delete this is causing some form of error
-    // delete planner_costmap_ros;    
 }
