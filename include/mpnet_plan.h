@@ -1,10 +1,18 @@
 /** 
  * Defines the class for mpnet local planner
  */
+#include <memory>
+
 #include <geometry_msgs/PoseStamped.h>
 #include <geometry_msgs/Twist.h>
-#include <costmap_2d/costmap_2d_ros.h>
+
 #include <tf2_ros/buffer.h>
+
+#include <costmap_2d/costmap_2d_ros.h>
+#include <costmap_2d/costmap_2d.h>
+
+#include <base_local_planner/world_model.h>
+#include <base_local_planner/costmap_model.h>
 
 namespace mpnet_local_planner{
 
@@ -15,6 +23,11 @@ namespace mpnet_local_planner{
          */
 
         public:
+            tf2_ros::Buffer* tf_;
+            costmap_2d::Costmap2DROS* navigation_costmap_ros_;
+            costmap_2d::Costmap2D* costmap_;
+            base_local_planner::WorldModel* world_model_;
+            bool initialized_;
 
             /**
              * @brief Compute the velocity commmand to send to the base
@@ -44,10 +57,10 @@ namespace mpnet_local_planner{
             /**
              * Destructor for the interface
              */
-            ~MpnetLocalPlanner(){};
+            ~MpnetLocalPlanner();
 
         private:
-            MpnetLocalPlanner(){};
+            MpnetLocalPlanner();
         
     };
 }
