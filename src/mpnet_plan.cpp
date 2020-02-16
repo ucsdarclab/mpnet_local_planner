@@ -21,8 +21,14 @@ namespace mpnet_local_planner{
     MpnetPlanner::MpnetPlanner(tf2_ros::Buffer& tf):
     tf_(tf),
     navigation_costmap_ros(NULL),
+    collision_costmap_ros(NULL),
+    costmap_collision_(NULL),
     costmap_(NULL),
     world_model(NULL),
+    space(std::make_shared<ob::DubinsStateSpace>(0.58)),
+    temp_traj(0.0,0.0,0.0,0.0,(unsigned int)100000),
+    bounds(NULL),
+    si(NULL),
     initialized_(false)
     {
         if (~initialized_)
@@ -44,12 +50,39 @@ namespace mpnet_local_planner{
                 }
             }
 
+            // Create a connection to the global costmap
+            // THIS IS A HACK FOR COLLISION CHECKING FOR TIME BEING
+            // THE CORRECT SOLUTION WOULD BE TO USE THE LOCAL COSTMAP 
+            // AND CHECK IF THE PATH GOES OUTSIDE THE BOUNDS OF THE LOCAL COSTMAP
+            collision_costmap_ros = new costmap_2d::Costmap2DROS("global_costmap", tf_);
+            collision_costmap_ros->pause();
+            costmap_collision_ = collision_costmap_ros->getCostmap();
+            world_model = new base_local_planner::CostmapModel(*costmap_collision_);
+            collision_costmap_ros->start();
+
+            // Create a connection to the local costmap
             navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap", tf_);
             navigation_costmap_ros -> pause();
             costmap_ = navigation_costmap_ros->getCostmap();
             navigation_costmap_ros -> start();
             initialized_ = true;
 
+            bounds = new ob::RealVectorBounds(2);
+            bounds->setLow(0,0.0);
+            bounds->setLow(1,0.0);
+            bounds->setLow(2,-M_PI);
+            bounds->setHigh(0,27.0);
+            bounds->setHigh(1,27.0);
+            bounds->setHigh(2,M_PI);
+            space->as<ob::SE2StateSpace>()->setBounds(*bounds);
+            space->setLongestValidSegmentFraction(0.0005);
+            si = std::make_shared<ob::SpaceInformation>(space);
+            si->setStateValidityChecker([this](const ob::State *state) -> bool
+            {
+                return this->isStateValid(state);
+            }
+            );
+            
             module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
             module.to(torch::kCPU);
         }
@@ -63,6 +96,15 @@ namespace mpnet_local_planner{
     {
         if (navigation_costmap_ros!=NULL)
             delete navigation_costmap_ros;
+
+        if (bounds!=NULL)
+            delete bounds;
+
+        if (collision_costmap_ros!=NULL)
+            delete collision_costmap_ros;
+
+        if (world_model!=NULL)
+            delete world_model;
     }
 
 
@@ -153,6 +195,66 @@ namespace mpnet_local_planner{
         inputs.clear();
         return targetPoint;
     }
+
+    bool MpnetPlanner::isStateValid(const ob::State *state)
+    {
+        const auto *s = state->as<ob::SE2StateSpace::StateType>();
+        std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
+        // Pass the orientation of the robot
+        double footprint_cost  = world_model->footprintCost(s->getX(), s->getY(),s->getYaw(), footprint);
+        return (footprint_cost>=0);
+    }
+
+    // base_local_planner::Trajectory MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds)
+    void MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
+    {
+        og::PathGeometric omplPath(si);
+        og::PathGeometric FinalPathFromStart(si, start());
+        ob::ScopedState<> target_pose(space), s(space);
+        bool isStartValid, isGoalValid;
+        std::vector<double> targetPose;
+        // base_local_planner::Trajectory traj(0.0,0.0,0.0,0.0, (unsigned int)10000);
+        traj.resetPoints();
+        for(int sample=0;sample<100;sample++)
+        {
+            targetPose = getTargetPoint(start, goal, bounds);
+            target_pose[0] = targetPose[0];
+            target_pose[1] = targetPose[1];
+            target_pose[2] = targetPose[2];
+            og::PathGeometric pathFromStart=og::PathGeometric(si, start(), target_pose());
+            isStartValid = pathFromStart.check();
+            
+            if (isStartValid)
+            {
+                std::cout<< "Valid sample point to start" << std::endl;
+                FinalPathFromStart.append(target_pose());
+                start = target_pose;
+            }
+
+            og::PathGeometric pathToGoal = og::PathGeometric(si, start(), goal());
+            isGoalValid = pathToGoal.check();
+            if (isGoalValid)
+            {
+                std::cout<< "Valid path found" << std::endl;
+                break;
+            }
+        }
+        
+        if (isStartValid && isGoalValid)
+            FinalPathFromStart.append(goal());
+
+        FinalPathFromStart.interpolate();
+        std::cout << FinalPathFromStart.getStateCount() << std::endl;
+        for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
+        {
+            s = FinalPathFromStart.getState(i);
+            traj.addPoint(s[0], s[1], s[2]);
+        }
+        std::cout << "Copied function \n";
+        // // return traj;
+        // std::vector<double> test{s[0], s[1], s[2]};
+        // return FinalPathFromStart;
+    } 
 }
 
 
@@ -198,8 +300,9 @@ int main(int argc,char* argv[]) {
     space->setLongestValidSegmentFraction(0.0005);
     // ob::SpaceInformation si(space);
     auto si(std::make_shared<ob::SpaceInformation>(space));
-    ob::ScopedState<> mpnet_start(space), mpnet_goal(space), current_pose(space), target_pose(space), state(space), s(space);
-    og::PathGeometric path(si);
+    ob::ScopedState<> mpnet_start(space), mpnet_goal(space), current_pose(space);
+    // og::PathGeometric path(si);
+    // base_local_planner::Trajectory path;
 
     // Start point
     mpnet_start[0] = 1.39847;
@@ -234,139 +337,45 @@ int main(int argc,char* argv[]) {
     ros::spinOnce();
 
     // ^^ FOR TESTING PURPOSES ^^
-
-    // Get the global costmap for collision checking -- THIS IS A HACK FOR COLLISION CHECKING FOR TIME BEING
-    // THE CORRECT SOLUTION WOULD BE TO USE THE LOCAL COSTMAP AND CHECK IF THE PATH GOES OUTSIDE THE BOUNDS
-    costmap_2d::Costmap2DROS* collision_costmap_ros = new costmap_2d::Costmap2DROS("global_costmap", buffer);
-    collision_costmap_ros -> pause();
-    costmap_2d::Costmap2D* costmap_collision = collision_costmap_ros->getCostmap();
-    base_local_planner::WorldModel* world_model = new base_local_planner::CostmapModel(*costmap_collision);
-    collision_costmap_ros -> start();
-
-    ros::Duration(10.0).sleep();
+    ros::Duration(2.0).sleep();
     ros::Rate rate(200.0);
-
-    si->setStateValidityChecker([&](const ob::State *state) -> bool
-        {
-            const auto *s = state->as<ob::SE2StateSpace::StateType>();
-            std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
-            // Pass the orientation of the robot
-            double footprint_cost  = world_model->footprintCost(s->getX(), s->getY(),s->getYaw(), footprint);
-            return (footprint_cost>=0);
-        });
 
     // Define the bound for space
     std::vector<double> spaceBound{6.0, 6.0, M_PI};
 
-    // CHECKING FOR COLLISION
-    std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
-    // Pass the orientation of the robot
-    double footprint_cost  = world_model->footprintCost(mpnet_start[0], mpnet_start[1], mpnet_start[2], footprint);
-    bool validState =  (footprint_cost>=0);
+    bool validState =  plan.isStateValid(mpnet_start());
     if (validState)
         std::cout << "Feasible Starting position" << std::endl;
     // ^^ END COLLISION CHECKING
 
     torch::Device device(torch::kCUDA);
 
-    // torch::jit::script::Module module = torch::jit::load(argv[1]);
-    // torch::jit::script::Module mode = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
-    // module.to(torch::kCPU);
-    std::cout << "ok\n";
     // Create a vector of inputs for current/goal states
-    std::vector<torch::jit::IValue> inputs;
-    std::vector<double> targetPose;
-
     geometry_msgs::PoseWithCovarianceStamped targetPoint;
-    // while (n.ok())
-    og::PathGeometric FinalPathToGoal(si, mpnet_goal());
-    og::PathGeometric FinalPathFromStart(si, mpnet_start());
-    bool isStartValid, isGoalValid, isStartGoalValid;
-    for(int sample=0;sample<100;sample++)
-    {
-        targetPose = plan.getTargetPoint(mpnet_start, mpnet_goal, spaceBound);
-
-        // Display the point on the map
-        targetPoint.header.frame_id = "/map";
-        targetPoint.pose.pose.position.x = targetPose[0];
-        targetPoint.pose.pose.position.y = targetPose[1];
-        targetPoint.pose.pose.position.z = 0.;
-
-        targetPoint.pose.pose.orientation.x = 0. ;
-        targetPoint.pose.pose.orientation.y = 0.;
-        targetPoint.pose.pose.orientation.z = sin(targetPose[2]/2);
-        targetPoint.pose.pose.orientation.w = cos(targetPose[2]/2);
-        
-        target_robot_pub.publish(targetPoint);
-        goal_robot_pub.publish(goal_pose);
-        ros::spinOnce();
-        // TODO: Check if the node can be reached
-        target_pose[0] = targetPose[0];
-        target_pose[1] = targetPose[1];
-        target_pose[2] = targetPose[2];
-
-        // TODO: Add point to path
-
-        og::PathGeometric pathFromStart=og::PathGeometric(si, mpnet_start(), target_pose());
-        isStartValid = pathFromStart.check();
-        
-        if (isStartValid)
-        {
-            std::cout<< "Valid sample point to start" << std::endl;
-            FinalPathFromStart.append(target_pose());
-            mpnet_start = target_pose;
-        }
-
-        og::PathGeometric pathToGoal = og::PathGeometric(si, mpnet_start(), mpnet_goal());
-        isGoalValid = pathToGoal.check();
-        if (isGoalValid)
-        {
-            std::cout<< "Valid path found" << std::endl;
-            break;
-        }
-
-        /* 
-        if (~isStartValid && isGoalValid)
-        {
-            std::cout << "Valid sample point to goal" << std::endl;
-            FinalPathToGoal.prepend(target_pose());
-            mpnet_goal = target_pose;
-        }
-        */
-        rate.sleep();
-        inputs.clear();
-    }
-    if (isStartValid && isGoalValid)
-    {
-        FinalPathFromStart.append(FinalPathToGoal);
-    }
-    path = FinalPathFromStart;
+    base_local_planner::Trajectory path;
+    // base_local_planner::Trajectory path = plan.getPath(mpnet_start, mpnet_goal, spaceBound);
+    plan.getPath(mpnet_start, mpnet_goal, spaceBound, path);
+    // ob::ScopedState<> s(space);
+    std::cout << "Fine till here";
     // TODO: Check if goal is reached
     gui_path.header.frame_id = "/map";
-    path.interpolate();
-    gui_path.poses.resize(path.getStateCount());
-    for(unsigned int i =0; i<path.getStateCount(); i++)
+    for(unsigned int i =0; i<path.getPointsSize(); i++)
     {
-        s = path.getState(i);
+        // s = path.getState(i);
         geometry_msgs::PoseStamped point;
-        point.pose.position.x = s[0];
-        point.pose.position.y = s[1];
+        double wx, wy, theta;
+        path.getPoint(i, wx, wy, theta);
+        point.pose.position.x = wx;
+        point.pose.position.y = wy;
 
         point.pose.orientation.x = 0.0;
         point.pose.orientation.y = 0.0;
-        point.pose.orientation.z = sin(s[2]/2);
-        point.pose.orientation.w = cos(s[2]/2);
+        point.pose.orientation.z = sin(theta/2);
+        point.pose.orientation.w = cos(theta/2);
 
         gui_path.poses[i] = point;
     }
     display_trajectory_pub.publish(gui_path);
     ros::spinOnce();
     rate.sleep();
-    path.clear();
-    // Cleanup
-    if (world_model!=NULL)
-        delete world_model;
-        
-    if (collision_costmap_ros!=NULL)
-        delete collision_costmap_ros;
 }

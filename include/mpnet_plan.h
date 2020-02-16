@@ -24,13 +24,8 @@ namespace og = ompl::geometric;
 
 namespace mpnet_local_planner{
     class MpnetPlanner{
-        tf2_ros::Buffer& tf_;
-        costmap_2d::Costmap2DROS* navigation_costmap_ros;
-        costmap_2d::Costmap2D* costmap_;
-        base_local_planner::WorldModel* world_model;
-        bool initialized_;
-
         public:
+        base_local_planner::Trajectory temp_traj;
         /**
          * @brief A default initializer
          */
@@ -81,10 +76,33 @@ namespace mpnet_local_planner{
          */
         std::vector<double> getTargetPoint(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds);
 
+        /**
+         * @brief Returns the path from start to goal
+         */
+        // base_local_planner::Trajectory getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds);
+        void getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj);
+
+        /**
+         * @brief Returns if the given state is in collision or not
+         * @param The current state to check
+         * @return True is the state is not in collision
+         */
+        bool isStateValid(const ob::State *state);
+
         private:
         static char* cost_translation_table;
+
+        tf2_ros::Buffer& tf_;
+        costmap_2d::Costmap2DROS *navigation_costmap_ros, *collision_costmap_ros;
+        costmap_2d::Costmap2D* costmap_, *costmap_collision_;
+        base_local_planner::WorldModel* world_model;
+        bool initialized_;
+
         std::vector<torch::jit::IValue> inputs;
         torch::jit::script::Module module;
         base_local_planner::Trajectory path;
+        ob::StateSpacePtr space;
+        ob::RealVectorBounds* bounds;
+        std::shared_ptr<ob::SpaceInformation> si;
     };
 }
