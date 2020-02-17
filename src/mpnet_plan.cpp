@@ -353,15 +353,12 @@ int main(int argc,char* argv[]) {
     // Create a vector of inputs for current/goal states
     geometry_msgs::PoseWithCovarianceStamped targetPoint;
     base_local_planner::Trajectory path;
-    // base_local_planner::Trajectory path = plan.getPath(mpnet_start, mpnet_goal, spaceBound);
     plan.getPath(mpnet_start, mpnet_goal, spaceBound, path);
-    // ob::ScopedState<> s(space);
-    std::cout << "Fine till here";
-    // TODO: Check if goal is reached
+    // Publish the message
     gui_path.header.frame_id = "/map";
+    gui_path.poses.resize(path.getPointsSize());
     for(unsigned int i =0; i<path.getPointsSize(); i++)
     {
-        // s = path.getState(i);
         geometry_msgs::PoseStamped point;
         double wx, wy, theta;
         path.getPoint(i, wx, wy, theta);
