@@ -25,13 +25,12 @@ namespace og = ompl::geometric;
 namespace mpnet_local_planner{
     class MpnetPlanner{
         public:
-        base_local_planner::Trajectory temp_traj;
         /**
          * @brief A default initializer
          */
         // MpnetPlanner();
 
-        MpnetPlanner(tf2_ros::Buffer &tf);
+        MpnetPlanner(tf2_ros::Buffer *tf);
 
         ~MpnetPlanner();
 
@@ -89,10 +88,15 @@ namespace mpnet_local_planner{
          */
         bool isStateValid(const ob::State *state);
 
+        bool isInitialized()
+        {
+            return initialized_;
+        }
+
         private:
         static char* cost_translation_table;
 
-        tf2_ros::Buffer& tf_;
+        tf2_ros::Buffer* tf_;
         costmap_2d::Costmap2DROS *navigation_costmap_ros, *collision_costmap_ros;
         costmap_2d::Costmap2D* costmap_, *costmap_collision_;
         base_local_planner::WorldModel* world_model;

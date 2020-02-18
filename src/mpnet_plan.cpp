@@ -18,20 +18,19 @@ namespace mpnet_local_planner{
     
     // MpnetPlanner::MpnetPlanner(){}
     
-    MpnetPlanner::MpnetPlanner(tf2_ros::Buffer& tf):
-    tf_(tf),
+    MpnetPlanner::MpnetPlanner(tf2_ros::Buffer* tf):
+    tf_(NULL),
     navigation_costmap_ros(NULL),
     collision_costmap_ros(NULL),
     costmap_collision_(NULL),
     costmap_(NULL),
     world_model(NULL),
     space(std::make_shared<ob::DubinsStateSpace>(0.58)),
-    temp_traj(0.0,0.0,0.0,0.0,(unsigned int)100000),
     bounds(NULL),
     si(NULL),
     initialized_(false)
     {
-        if (~initialized_)
+        if (~isInitialized())
         {
             if (cost_translation_table==NULL)
             {
@@ -54,14 +53,15 @@ namespace mpnet_local_planner{
             // THIS IS A HACK FOR COLLISION CHECKING FOR TIME BEING
             // THE CORRECT SOLUTION WOULD BE TO USE THE LOCAL COSTMAP 
             // AND CHECK IF THE PATH GOES OUTSIDE THE BOUNDS OF THE LOCAL COSTMAP
-            collision_costmap_ros = new costmap_2d::Costmap2DROS("global_costmap", tf_);
+            tf_ = tf;
+            collision_costmap_ros = new costmap_2d::Costmap2DROS("global_costmap", *tf_);
             collision_costmap_ros->pause();
             costmap_collision_ = collision_costmap_ros->getCostmap();
             world_model = new base_local_planner::CostmapModel(*costmap_collision_);
             collision_costmap_ros->start();
 
             // Create a connection to the local costmap
-            navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap", tf_);
+            navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap", *tf_);
             navigation_costmap_ros -> pause();
             costmap_ = navigation_costmap_ros->getCostmap();
             navigation_costmap_ros -> start();
@@ -268,7 +268,7 @@ int main(int argc,char* argv[]) {
 
     nav_msgs::OccupancyGrid grid;
 
-    mpnet_local_planner::MpnetPlanner plan(buffer);
+    mpnet_local_planner::MpnetPlanner plan(&buffer);
 
     // -- FOR TESTING PURPOSES - setting start and goal location --
 
