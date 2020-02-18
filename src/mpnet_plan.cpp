@@ -54,7 +54,7 @@ namespace mpnet_local_planner{
             // THE CORRECT SOLUTION WOULD BE TO USE THE LOCAL COSTMAP 
             // AND CHECK IF THE PATH GOES OUTSIDE THE BOUNDS OF THE LOCAL COSTMAP
             tf_ = tf;
-            collision_costmap_ros = new costmap_2d::Costmap2DROS("global_costmap", *tf_);
+            collision_costmap_ros = new costmap_2d::Costmap2DROS("collision_costmap", *tf_);
             collision_costmap_ros->pause();
             costmap_collision_ = collision_costmap_ros->getCostmap();
             world_model = new base_local_planner::CostmapModel(*costmap_collision_);
@@ -265,11 +265,9 @@ int main(int argc,char* argv[]) {
     tf2_ros::TransformListener tf(buffer);
 
     ros::NodeHandle n;
-
     nav_msgs::OccupancyGrid grid;
 
     mpnet_local_planner::MpnetPlanner plan(&buffer);
-
     // -- FOR TESTING PURPOSES - setting start and goal location --
 
     ros::Publisher move_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1);
