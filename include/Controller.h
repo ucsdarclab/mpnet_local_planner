@@ -42,7 +42,6 @@ public:
 	std::vector<double> path_x = vector<double>(32);
 	std::vector<double> path_y = vector<double>(32)	;
 	std::vector<double> path_goal = vector<double>(2);
-	
 	Controller(){};
     
     
