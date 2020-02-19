@@ -107,17 +107,23 @@ namespace mpnet_local_planner{
         if (transformed_plan.empty())
             return false;
 
-        const geometry_msgs::PoseStamped& goal_point = transformed_plan.back();
-        // The goal is the last point in the global plan
-        const double goal_x = goal_point.pose.position.x;
-        const double goal_y = goal_point.pose.position.y;
+        geometry_msgs::PoseStamped goal_point = transformed_plan.back();
+        geometry_msgs::PoseStamped goal_point_minus=transformed_plan.end()[-2];
 
-        const double yaw = tf2::getYaw(goal_point.pose.orientation);
-        double goal_th = yaw;
+        // Calculate the distance of the vector
+        double diff_x = goal_point.pose.position.x - goal_point_minus.pose.position.x;
+        double diff_y = goal_point.pose.position.y - goal_point_minus.pose.position.y;
+
+        double vec_len = sqrt(diff_x*diff_x + diff_y *diff_y);
+        double angle = atan2(diff_y, diff_x);
+        goal_point.pose.orientation.z = sin(angle/2);
+        goal_point.pose.orientation.w = cos(angle/2);
 
         // TODO: Check to see goal tolerance
         base_local_planner::Trajectory path;
-        // tc_->getPath(start, goal, bounds, path);
+        // Define the bound for space - THIS IS A HACK, need to add this as a class variable
+        std::vector<double> spaceBound{6.0, 6.0, M_PI};
+        tc_->getPath(global_pose, goal_point, spaceBound, path);
 
 
     }
