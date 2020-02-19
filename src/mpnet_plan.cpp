@@ -280,9 +280,9 @@ class GetGlobalPath
         global_path = msg;
     }
 
-    std::vector<geometry_msgs::PoseStamped> getPath()
+    nav_msgs::Path getPath()
     {
-        return global_path.poses;
+        return global_path;
     }
 };
 
@@ -311,6 +311,8 @@ int main(int argc,char* argv[]) {
 
     std::string global_frame_ = navigation_costmap_ros->getGlobalFrameID();
 
+    std::cout << "global frame: " << global_frame_ << std::endl;
+
     // Waiting for rviz to connect. This prevents data lose
     while (0 == move_robot_pub.getNumSubscribers()) 
     {
@@ -323,7 +325,14 @@ int main(int argc,char* argv[]) {
     ros::spinOnce();
 
     std::vector<geometry_msgs::PoseStamped> global_plan_;
-    global_plan_ = global_plan_obj.getPath();
+    nav_msgs::Path global_path = global_plan_obj.getPath();
+    global_plan_.clear();
+    for(unsigned int k=0;k<global_path.poses.size(); k++)
+    {
+        global_plan_.push_back(global_path.poses[k]);
+    }
+    // global_plan_ = global_plan_obj.getPath();
+    std::cout << "Path header: " << global_plan_[0].header.frame_id << std::endl; 
     if (global_plan_.empty())
     {
         ROS_WARN("Could not get the global path");
@@ -335,7 +344,7 @@ int main(int argc,char* argv[]) {
         {
             std::cout << "Didn't get robot pose \n";
         }
-
+        std::cout << "Robot frame: " << global_pose.header.frame_id << std::endl;
         std::vector<geometry_msgs::PoseStamped> transformed_plan;
         if(!base_local_planner::transformGlobalPlan(buffer, global_plan_, global_pose, *costmap_, global_frame_, transformed_plan))
         {
@@ -350,6 +359,16 @@ int main(int argc,char* argv[]) {
         }
 
         geometry_msgs::PoseStamped goal_point = transformed_plan.back();
+        geometry_msgs::PoseStamped goal_point_minus = transformed_plan.end()[-2];
+
+        // Calculate the distance of the vector
+        double diff_x = goal_point.pose.position.x - goal_point_minus.pose.position.x;
+        double diff_y = goal_point.pose.position.y - goal_point_minus.pose.position.y;
+
+        double vec_len = sqrt(diff_x*diff_x + diff_y *diff_y);
+        double angle = atan2(diff_y, diff_x);
+        goal_point.pose.orientation.z = sin(angle/2);
+        goal_point.pose.orientation.w = cos(angle/2);
 
         geometry_msgs::PoseWithCovarianceStamped rrt_point, goal_pose;
         // Starting point
