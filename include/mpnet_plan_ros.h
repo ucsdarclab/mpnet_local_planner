@@ -16,7 +16,7 @@
 #include <base_local_planner/costmap_model.h>
 
 #include <nav_core/base_local_planner.h>
-#include <nav_core/base_local_planner/odometry_helper_ros.h>
+#include <base_local_planner/odometry_helper_ros.h>
 
 #include <mpnet_plan.h>
 #include <ompl/base/ScopedState.h>
@@ -112,7 +112,7 @@ namespace mpnet_local_planner{
             bool prune_plan_;
             std::vector<geometry_msgs::PoseStamped> global_plan_;
 
-            Controller controller();
-            base_local_planner::OdometryHelperRos odom_helper_(std::string("odom"));
+            Controller controller;
+            base_local_planner::OdometryHelperRos odom_helper_;
     };
 }

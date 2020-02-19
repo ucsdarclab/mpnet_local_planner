@@ -149,7 +149,7 @@ add_library(${PROJECT_NAME}
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/mpnet_plan.cpp src/Controller.cpp, src/MPC.cpp)
+add_executable(${PROJECT_NAME}_node src/mpnet_plan.cpp src/Controller.cpp src/MPC.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the

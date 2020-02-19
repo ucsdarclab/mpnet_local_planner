@@ -16,6 +16,7 @@ namespace mpnet_local_planner{
     tf_(NULL),
     initialized_(false),
     navigation_costmap_ros_(NULL),
+    odom_helper_("odom"),
     tc_(NULL)
     {
         initialize(name, tf, costmap_ros);
@@ -117,9 +118,14 @@ namespace mpnet_local_planner{
         base_local_planner::Trajectory path;
         tc_->getPath(start, goal, bounds, path);
 
-        controller.observe(odom_helper_);
-        controller.get_path(path);
-        controller.control(cmd_vel);
+        geometry_msgs::PoseStamped robot_vel;
+		odom_helper_.getRobotVel(robot_vel);
+		nav_msgs::Odometry base_odom;
+		odom_helper_.getOdom(base_odom);
+
+        // controller.observe(odom_helper_);
+        // controller.get_path(path);
+        // controller.control(cmd_vel);
     }
 
 }
