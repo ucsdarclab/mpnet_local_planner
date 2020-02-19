@@ -16,6 +16,7 @@
 #include <base_local_planner/costmap_model.h>
 
 #include <nav_core/base_local_planner.h>
+#include <nav_core/base_local_planner/odometry_helper_ros.h>
 
 #include <mpnet_plan.h>
 #include <ompl/base/ScopedState.h>

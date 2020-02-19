@@ -11,8 +11,7 @@
 #include "nav_msgs/Path.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Pose.h"
-#include <nav_core/base_local_planner.h>
-
+#include <nav_core/base_local_planner/odometry_helper_ros.h>
 // for MPC
 #include "MPC.h"
 #include <cppad/cppad.hpp>
