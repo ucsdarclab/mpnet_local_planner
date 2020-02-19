@@ -30,7 +30,7 @@ namespace mpnet_local_planner{
          */
         // MpnetPlanner();
 
-        MpnetPlanner(tf2_ros::Buffer *tf);
+        MpnetPlanner(tf2_ros::Buffer *tf, costmap_2d::Costmap2DROS *costmap_ros);
 
         ~MpnetPlanner();
 
@@ -79,7 +79,8 @@ namespace mpnet_local_planner{
          * @brief Returns the path from start to goal
          */
         // base_local_planner::Trajectory getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds);
-        void getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj);
+        // void getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj);
+        void getPath(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, std::vector<double> bounds, base_local_planner::Trajectory &traj);
 
         /**
          * @brief Returns if the given state is in collision or not

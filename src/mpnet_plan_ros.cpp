@@ -2,9 +2,13 @@
  * Describing different components of the local planner  
 */ 
 
+
 #include <mpnet_plan_ros.h>
 
+#include <base_local_planner/goal_functions.h>
 #include <nav_msgs/Path.h>
+
+#include <tf2/utils.h>
 
 namespace mpnet_local_planner{
 
@@ -12,7 +16,6 @@ namespace mpnet_local_planner{
     tf_(NULL),
     initialized_(false),
     navigation_costmap_ros_(NULL),
-    world_model_(NULL),
     tc_(NULL)
     {
         initialize(name, tf, costmap_ros);
@@ -21,10 +24,7 @@ namespace mpnet_local_planner{
     }
 
     MpnetLocalPlanner::~MpnetLocalPlanner()
-    {
-        if (world_model_!=NULL)
-            delete world_model_;
-        
+    {        
         if (navigation_costmap_ros_!=NULL)
             delete navigation_costmap_ros_;
 
@@ -39,13 +39,18 @@ namespace mpnet_local_planner{
             navigation_costmap_ros_ = costmap_ros;
             costmap_ = navigation_costmap_ros_->getCostmap();
             tf_ = tf;
-
+            // ---------Set parameters of the model ----------------
             // TODO: Load network model from reading the parameter file
             // private_nh.param("file_name", <file_name>, <default value>);
 
             // TODO: Come up with a strategy to send controller frequency commands
             
-            tc_ = new MpnetPlanner(tf);
+            prune_plan_ = true;
+            // ^^ Set the parameters of the model using param file
+            global_frame_ = costmap_ros->getGlobalFrameID();
+            robot_base_frame_ = costmap_ros->getBaseFrameID();
+            
+            tc_ = new MpnetPlanner(tf, navigation_costmap_ros_);
             initialized_ = true;
         }
         else
@@ -54,9 +59,67 @@ namespace mpnet_local_planner{
         }   
     }
 
-    bool setPlan(const std::vector<geometry_msgs::PoseStamped>& plan)
+    bool MpnetLocalPlanner::setPlan(const std::vector<geometry_msgs::PoseStamped>& orig_global_plan)
     {
-        
+        if (!isInitialized())
+        {
+            ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+            return false;
+        }
+
+        global_plan_.clear();
+        global_plan_ = orig_global_plan;
+
+        reached_goal_ = false;
+        return true;
+    }
+
+    bool MpnetLocalPlanner::computeVelocityCommands(geometry_msgs::Twist& cmd_vel)
+    {
+        if (!isInitialized())
+        {
+            ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+            return false;
+        }
+
+        std::vector<geometry_msgs::PoseStamped> local_plan;
+        geometry_msgs::PoseStamped global_pose;
+        if (!navigation_costmap_ros_->getRobotPose(global_pose)){
+            return false;
+        }
+
+        std::vector<geometry_msgs::PoseStamped> transformed_plan;
+        if (!base_local_planner::transformGlobalPlan(*tf_, global_plan_, global_pose, *costmap_, global_frame_, transformed_plan))
+        {
+            ROS_WARN("Could not transform the global plan to the frame of the controller");
+            return false;
+        }
+
+        if(prune_plan_)
+            base_local_planner::prunePlan(global_pose, transformed_plan, global_plan_);
+
+        geometry_msgs::PoseStamped drive_cmds;
+        drive_cmds.header.frame_id = robot_base_frame_;
+
+        geometry_msgs::PoseStamped robot_vel;
+        // odom_helper_.getRobotVel(robot_vel);
+
+        if (transformed_plan.empty())
+            return false;
+
+        const geometry_msgs::PoseStamped& goal_point = transformed_plan.back();
+        // The goal is the last point in the global plan
+        const double goal_x = goal_point.pose.position.x;
+        const double goal_y = goal_point.pose.position.y;
+
+        const double yaw = tf2::getYaw(goal_point.pose.orientation);
+        double goal_th = yaw;
+
+        // TODO: Check to see goal tolerance
+        base_local_planner::Trajectory path;
+        // tc_->getPath(start, goal, bounds, path);
+
+
     }
 
 }

@@ -6,11 +6,13 @@
 #include <ros/ros.h>
 
 #include <base_local_planner/costmap_model.h>
+#include <base_local_planner/goal_functions.h>
 
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 
 #include <mpnet_plan.h>
+#include <tf2/utils.h>
 
 namespace mpnet_local_planner{
     
@@ -18,7 +20,7 @@ namespace mpnet_local_planner{
     
     // MpnetPlanner::MpnetPlanner(){}
     
-    MpnetPlanner::MpnetPlanner(tf2_ros::Buffer* tf):
+    MpnetPlanner::MpnetPlanner(tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS *costmap_ros):
     tf_(NULL),
     navigation_costmap_ros(NULL),
     collision_costmap_ros(NULL),
@@ -61,11 +63,8 @@ namespace mpnet_local_planner{
             collision_costmap_ros->start();
 
             // Create a connection to the local costmap
-            navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap", *tf_);
-            navigation_costmap_ros -> pause();
+            navigation_costmap_ros = costmap_ros;
             costmap_ = navigation_costmap_ros->getCostmap();
-            navigation_costmap_ros -> start();
-            initialized_ = true;
 
             bounds = new ob::RealVectorBounds(2);
             bounds->setLow(0,0.0);
@@ -85,6 +84,8 @@ namespace mpnet_local_planner{
             
             module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
             module.to(torch::kCPU);
+            initialized_ = true;
+
         }
         else
         {
@@ -206,10 +207,20 @@ namespace mpnet_local_planner{
     }
 
     // base_local_planner::Trajectory MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds)
-    void MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
+    // void MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
+    void MpnetPlanner::getPath(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
     {
         og::PathGeometric omplPath(si);
-        og::PathGeometric FinalPathFromStart(si, start());
+        // Convert poseStamped to Scoped state
+        ob::ScopedState<> start_ompl(space), goal_ompl(space);
+        start_ompl[0] = start.pose.position.x; 
+        start_ompl[1] = start.pose.position.y;
+        start_ompl[2] = tf2::getYaw(start.pose.orientation);
+        goal_ompl[0] = goal.pose.position.x ;
+        goal_ompl[1] = goal.pose.position.y ;
+        goal_ompl[2] = tf2::getYaw(goal.pose.orientation);
+
+        og::PathGeometric FinalPathFromStart(si, start_ompl());
         ob::ScopedState<> target_pose(space), s(space);
         bool isStartValid, isGoalValid;
         std::vector<double> targetPose;
@@ -217,21 +228,21 @@ namespace mpnet_local_planner{
         traj.resetPoints();
         for(int sample=0;sample<100;sample++)
         {
-            targetPose = getTargetPoint(start, goal, bounds);
+            targetPose = getTargetPoint(start_ompl, goal_ompl, bounds);
             target_pose[0] = targetPose[0];
             target_pose[1] = targetPose[1];
             target_pose[2] = targetPose[2];
-            og::PathGeometric pathFromStart=og::PathGeometric(si, start(), target_pose());
+            og::PathGeometric pathFromStart=og::PathGeometric(si, start_ompl(), target_pose());
             isStartValid = pathFromStart.check();
             
             if (isStartValid)
             {
                 std::cout<< "Valid sample point to start" << std::endl;
                 FinalPathFromStart.append(target_pose());
-                start = target_pose;
+                start_ompl = target_pose;
             }
 
-            og::PathGeometric pathToGoal = og::PathGeometric(si, start(), goal());
+            og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
             isGoalValid = pathToGoal.check();
             if (isGoalValid)
             {
@@ -241,7 +252,7 @@ namespace mpnet_local_planner{
         }
         
         if (isStartValid && isGoalValid)
-            FinalPathFromStart.append(goal());
+            FinalPathFromStart.append(goal_ompl());
 
         FinalPathFromStart.interpolate();
         std::cout << FinalPathFromStart.getStateCount() << std::endl;
@@ -257,6 +268,23 @@ namespace mpnet_local_planner{
     } 
 }
 
+class GetGlobalPath
+{
+    nav_msgs::Path global_path;
+    public:
+    GetGlobalPath(){}
+    ~GetGlobalPath(){}
+
+    void globalPlanCallback(const nav_msgs::Path &msg)
+    {
+        global_path = msg;
+    }
+
+    std::vector<geometry_msgs::PoseStamped> getPath()
+    {
+        return global_path.poses;
+    }
+};
 
 int main(int argc,char* argv[]) {
 
@@ -267,7 +295,11 @@ int main(int argc,char* argv[]) {
     ros::NodeHandle n;
     nav_msgs::OccupancyGrid grid;
 
-    mpnet_local_planner::MpnetPlanner plan(&buffer);
+    costmap_2d::Costmap2DROS *navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap",  buffer);
+    navigation_costmap_ros->pause();
+    costmap_2d::Costmap2D *costmap_ = navigation_costmap_ros->getCostmap();
+    mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros);
+    navigation_costmap_ros->start();
     // -- FOR TESTING PURPOSES - setting start and goal location --
 
     ros::Publisher move_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1);
@@ -276,101 +308,101 @@ int main(int argc,char* argv[]) {
 
     ros::Publisher display_trajectory_pub = n.advertise<nav_msgs::Path>("/mpnet_path",1);
     nav_msgs::Path gui_path;
+
+    std::string global_frame_ = navigation_costmap_ros->getGlobalFrameID();
+
     // Waiting for rviz to connect. This prevents data lose
     while (0 == move_robot_pub.getNumSubscribers()) 
     {
           ROS_INFO("Waiting for subscribers to connect");
           ros::Duration(0.1).sleep();
     }
-    geometry_msgs::PoseWithCovarianceStamped rrt_point, goal_pose;
-    rrt_point.header.frame_id = "/map";
-
-    ob::StateSpacePtr space(std::make_shared<ob::DubinsStateSpace>(0.58));
-    ob::RealVectorBounds bounds(2);
-    bounds.setLow(0,0.0);
-    bounds.setLow(1,0.0);
-    bounds.setHigh(0, 27.0);
-    bounds.setHigh(1, 27.0);
-
-    bounds.setLow(2, -3.14);
-    bounds.setHigh(2, 3.14);
-    space->as<ob::SE2StateSpace>()->setBounds(bounds);
-    space->setLongestValidSegmentFraction(0.0005);
-    // ob::SpaceInformation si(space);
-    auto si(std::make_shared<ob::SpaceInformation>(space));
-    ob::ScopedState<> mpnet_start(space), mpnet_goal(space), current_pose(space);
-    // og::PathGeometric path(si);
-    // base_local_planner::Trajectory path;
-
-    // Start point
-    mpnet_start[0] = 1.39847;
-    mpnet_start[1] = 3.31964;
-    mpnet_start[2] = 1.65756; 
-
-    rrt_point.pose.pose.position.x = mpnet_start[0];
-    rrt_point.pose.pose.position.y = mpnet_start[1];
-    rrt_point.pose.pose.position.z = 0.;
-
-    rrt_point.pose.pose.orientation.x = 0. ;
-    rrt_point.pose.pose.orientation.y = 0.;
-    rrt_point.pose.pose.orientation.z = sin(mpnet_start[2]/2);
-    rrt_point.pose.pose.orientation.w = cos(mpnet_start[2]/2);
-    
-    mpnet_goal[0] = 2.7811;
-    mpnet_goal[1] = 5.4415; 
-    mpnet_goal[2] = 0.02; 
-
-    goal_pose.header.frame_id = "/map";
-    goal_pose.pose.pose.position.x = mpnet_goal[0];
-    goal_pose.pose.pose.position.y = mpnet_goal[1];
-    goal_pose.pose.pose.position.z = 0.;
-
-    goal_pose.pose.pose.orientation.x = 0. ;
-    goal_pose.pose.pose.orientation.y = 0.;
-    goal_pose.pose.pose.orientation.z = sin(mpnet_goal[2]/2);
-    goal_pose.pose.pose.orientation.w = cos(mpnet_goal[2]/2);
-
-    move_robot_pub.publish(rrt_point);
-    goal_robot_pub.publish(goal_pose);
+    GetGlobalPath global_plan_obj;
+    ros::Subscriber global_plan_sub = n.subscribe("/move_base/TrajectoryPlannerROS/global_plan", 1 , &GetGlobalPath::globalPlanCallback, &global_plan_obj);
+    ros::Duration(1).sleep();
     ros::spinOnce();
 
-    // ^^ FOR TESTING PURPOSES ^^
-    ros::Duration(2.0).sleep();
-    ros::Rate rate(200.0);
-
-    // Define the bound for space
-    std::vector<double> spaceBound{6.0, 6.0, M_PI};
-
-    bool validState =  plan.isStateValid(mpnet_start());
-    if (validState)
-        std::cout << "Feasible Starting position" << std::endl;
-    // ^^ END COLLISION CHECKING
-
-    torch::Device device(torch::kCUDA);
-
-    // Create a vector of inputs for current/goal states
-    geometry_msgs::PoseWithCovarianceStamped targetPoint;
-    base_local_planner::Trajectory path;
-    plan.getPath(mpnet_start, mpnet_goal, spaceBound, path);
-    // Publish the message
-    gui_path.header.frame_id = "/map";
-    gui_path.poses.resize(path.getPointsSize());
-    for(unsigned int i =0; i<path.getPointsSize(); i++)
+    std::vector<geometry_msgs::PoseStamped> global_plan_;
+    global_plan_ = global_plan_obj.getPath();
+    if (global_plan_.empty())
     {
-        geometry_msgs::PoseStamped point;
-        double wx, wy, theta;
-        path.getPoint(i, wx, wy, theta);
-        point.pose.position.x = wx;
-        point.pose.position.y = wy;
-
-        point.pose.orientation.x = 0.0;
-        point.pose.orientation.y = 0.0;
-        point.pose.orientation.z = sin(theta/2);
-        point.pose.orientation.w = cos(theta/2);
-
-        gui_path.poses[i] = point;
+        ROS_WARN("Could not get the global path");
     }
-    display_trajectory_pub.publish(gui_path);
-    ros::spinOnce();
-    rate.sleep();
+    else
+    {    
+        geometry_msgs::PoseStamped global_pose;
+        if (!navigation_costmap_ros->getRobotPose(global_pose))
+        {
+            std::cout << "Didn't get robot pose \n";
+        }
+
+        std::vector<geometry_msgs::PoseStamped> transformed_plan;
+        if(!base_local_planner::transformGlobalPlan(buffer, global_plan_, global_pose, *costmap_, global_frame_, transformed_plan))
+        {
+            ROS_WARN("Could not transform the global plan to the frame of the controller");
+        }
+
+        base_local_planner::prunePlan(global_pose, transformed_plan, global_plan_);
+
+        if (transformed_plan.empty())
+        {
+            ROS_ERROR("No path found in the current frame");
+        }
+
+        geometry_msgs::PoseStamped goal_point = transformed_plan.back();
+
+        geometry_msgs::PoseWithCovarianceStamped rrt_point, goal_pose;
+        // Starting point
+        rrt_point.header.frame_id = "/map";
+        rrt_point.pose.pose = global_pose.pose;
+
+        // Goal point 
+        goal_pose.header.frame_id = "/map";
+        goal_pose.pose.pose = goal_point.pose;
+
+        goal_robot_pub.publish(goal_pose);
+        ros::spinOnce();
+
+        // ^^ FOR TESTING PURPOSES ^^
+        ros::Duration(2.0).sleep();
+        ros::Rate rate(200.0);
+
+        // Define the bound for space
+        std::vector<double> spaceBound{6.0, 6.0, M_PI};
+
+        // bool validState =  plan.isStateValid(mpnet_start());
+        // if (validState)
+        //     std::cout << "Feasible Starting position" << std::endl;
+        // ^^ END COLLISION CHECKING
+
+        torch::Device device(torch::kCUDA);
+
+        // Create a vector of inputs for current/goal states
+        geometry_msgs::PoseWithCovarianceStamped targetPoint;
+        base_local_planner::Trajectory path;
+        plan.getPath(global_pose, goal_point, spaceBound, path);
+        // Publish the message
+        gui_path.header.frame_id = "/map";
+        gui_path.poses.resize(path.getPointsSize());
+        for(unsigned int i =0; i<path.getPointsSize(); i++)
+        {
+            geometry_msgs::PoseStamped point;
+            double wx, wy, theta;
+            path.getPoint(i, wx, wy, theta);
+            point.pose.position.x = wx;
+            point.pose.position.y = wy;
+
+            point.pose.orientation.x = 0.0;
+            point.pose.orientation.y = 0.0;
+            point.pose.orientation.z = sin(theta/2);
+            point.pose.orientation.w = cos(theta/2);
+
+            gui_path.poses[i] = point;
+        }
+        display_trajectory_pub.publish(gui_path);
+        ros::spinOnce();
+        rate.sleep();
+        // if (navigation_costmap_ros!=NULL)
+        //     delete navigation_costmap_ros;
+        }
 }
