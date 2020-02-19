@@ -101,8 +101,6 @@ namespace mpnet_local_planner{
         geometry_msgs::PoseStamped drive_cmds;
         drive_cmds.header.frame_id = robot_base_frame_;
 
-        geometry_msgs::PoseStamped robot_vel;
-        // odom_helper_.getRobotVel(robot_vel);
 
         if (transformed_plan.empty())
             return false;
@@ -117,9 +115,11 @@ namespace mpnet_local_planner{
 
         // TODO: Check to see goal tolerance
         base_local_planner::Trajectory path;
-        // tc_->getPath(start, goal, bounds, path);
+        tc_->getPath(start, goal, bounds, path);
 
-
+        controller.observe(odom_helper_);
+        controller.get_path(path);
+        controller.control(cmd_vel);
     }
 
 }
