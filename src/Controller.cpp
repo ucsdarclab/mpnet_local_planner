@@ -5,30 +5,21 @@ namespace mpnet_local_planner{
 	{	
 		
 		// position
-		x = base_odom.pose.pose.position.x;
+		x = base_odom.pose.pose.position.x;	
 		y = base_odom.pose.pose.position.y;
-		
-		// pose
-		// tf::Quaternion q(base_odom.pose.orientation.x, 
-		// 				base_odom.pose.orientation.y, 
-		// 				base_odom.pose.orientation.z, 
-		// 				base_odom.pose.orientation.w);
-		// tf::Matrix3x3 m(q);
-		// double roll, pitch, yaw;
-		// m.getRPY(roll, pitch, yaw);
-		// th = yaw;
+	
 		th = tf2::getYaw(base_odom.pose.pose.orientation);
 
 		// velocity
 		vel = sqrt(robot_vel.pose.position.x * robot_vel.pose.position.x + robot_vel.pose.position.y*robot_vel.pose.position.y);
 		vth = tf2::getYaw(robot_vel.pose.orientation);
-
+		// ROS_INFO("x: [%f], y:[%f], th:[%f]", x, y, th);
 	}
 
 	void Controller::get_path(base_local_planner::Trajectory& traj)
 	{
-		// std::cout<<poses.size()<<std::endl;
-		int k = 2;
+		// std::cout<<traj.getPointsSize()<<std::endl;
+		int k = 4;
 		int length = traj.getPointsSize()>(std::size_t)(N*k) ? N: traj.getPointsSize(), start = 0;
 		double min = 1e10;
 		double xi = 0., yi = 0., tmp = 0., thi=0;
@@ -57,31 +48,27 @@ namespace mpnet_local_planner{
 			path_x.at(i) = xi;
 			path_y.at(i) = yi;
 		}
+		
 	}
 
 
-	void Controller::control(geometry_msgs::Twist& cmd_vel){
-		// set up msg
-		ackermann_msgs::AckermannDriveStamped _ackermann_msg = ackermann_msgs::AckermannDriveStamped();
-		_ackermann_msg.header.frame_id = "base_link";
-		_ackermann_msg.header.stamp = ros::Time::now();
-
-		// vector<double> ptsx(path_x.begin()+curr, path_x.begin() + std::min((int)path_x.size()-1, curr+6));
-		// vector<double> ptsy(path_y.begin()+curr, path_y.begin() + std::min((int)path_y.size()-1, curr+6));
-		
+	void Controller::control(ackermann_msgs::AckermannDriveStamped& _ackermann_msg){
 		// deal with path
+		if(verbose){
+			// for (unsigned int i = 0; i < ptsx.size(); i++){
+			// 	ROS_INFO("[%f],[%f]\n", ptsx.at(i),ptsy.at(i));
+			// }
+			ROS_INFO("x: [%f], y:[%f], th:[%f], goalx: [%f], goaly: [%f]", x, y, th, path_goal.at(0), path_goal.at(1));
+		}
 		if (pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2) < 0.1*0.1 || path_x.size()<1){
 			// reached
 			// curr = 0;
-			cmd_vel.linear.x = 0;
-			cmd_vel.linear.y = 0;
-			cmd_vel.linear.z = 0;
-			cmd_vel.angular.x = 0;
-			cmd_vel.angular.y = 0;
-			cmd_vel.angular.z = 0;
+			// std::cout<<"reached"<<std::endl;
+			_ackermann_msg.drive.steering_angle = 0;
+			_ackermann_msg.drive.speed = 0;
+			_ackermann_msg.drive.acceleration = 0;//throttle_value;
 		}
-		else{	
-
+		else{
 			std::vector<double> ptsx(N, path_x.back());
 			std::vector<double> ptsy(N, path_y.back());
 			// vector<double> ptsy = std::vector<double>(N);
@@ -105,17 +92,92 @@ namespace mpnet_local_planner{
 					ptsy[i] = diffy * cos(psi) - diffx * sin(psi);
 			}
 			// int horizon = ptsx.size();
-			Eigen::VectorXd ptsxV = Eigen::VectorXd::Map(ptsx.data(), ptsx.size());
-			Eigen::VectorXd ptsyV = Eigen::VectorXd::Map(ptsy.data(), ptsy.size());
+
+			std::vector<double> ptsxV = ptsx;
+			std::vector<double> ptsyV = ptsy;
+			std::vector<double> state;
+
+			double px_l = /*v*/ 0.3 * dt;
+			double py_l = 0.0;
+			double psi_l = /*v*/ 0.3 * str / Lf * dt;
+			double v_l = 0.3;//v + throttle*dt;
+			state.push_back(px_l);
+			state.push_back(py_l);
+			state.push_back(psi_l);
+			state.push_back(v_l);
+			std::vector<double> r;
+			r = mpc.Solve(state, ptsxV, ptsyV);
+
+			double steer_value = r[0]; /// (deg2rad(25)*Lf);
+			double throttle_value = r[1]; //r[1]*(1-fabs(steer_value))+0.1;
+			double velocity_value = vel + throttle_value * dt;  
 			
-			Eigen::VectorXd state(4);
+			_ackermann_msg.drive.steering_angle = steer_value;
+			_ackermann_msg.drive.speed = velocity_value;
+			// _ackermann_msg.drive.acceleration = throttle_value;//throttle_value;
+			if(verbose){
+				ROS_INFO("sta: [%f], v:[%f], a:[%f]", steer_value, velocity_value, throttle_value);
+			}
 			
+		}		
+	}
+
+	void Controller::control_cmd_vel(geometry_msgs::Twist& cmd_vel){
+		// deal with path
+		if(verbose){
+			// for (unsigned int i = 0; i < ptsx.size(); i++){
+			// 	ROS_INFO("[%f],[%f]\n", ptsx.at(i),ptsy.at(i));
+			// }
+			
+			ROS_INFO("x: [%f], y:[%f], th:[%f], goalx: [%f], goaly: [%f]", x, y, th, path_goal.at(0), path_goal.at(1));
+		}
+		if (pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2) < 0.1*0.1 || path_x.size()<1){
+			// reached
+			// curr = 0;
+			// std::cout<<"reached"<<std::endl;
+			
+			cmd_vel.linear.x = 0;
+			cmd_vel.linear.y = 0;
+			cmd_vel.linear.z = 0;
+			cmd_vel.angular.x = 0;
+			cmd_vel.angular.y = 0;
+			cmd_vel.angular.z = 0;
+		}
+		else{
+			std::vector<double> ptsx(N, path_x.back());
+			std::vector<double> ptsy(N, path_y.back());
+			// vector<double> ptsy = std::vector<double>(N);
+			int length = ((path_x.size()-1) < (N-1)) ? (path_x.size()-1) : (N-1);
+			for( int i = 0; i < length ; i++){
+				ptsx.at(i) = path_x.at(i);
+				ptsy.at(i) = path_y.at(i);
+			}
+			// solve MPC		
+			double px = x;
+			double py = y;
+			double psi = th;
+			double v = vel;
+
+			double str = sta;
+			double throttle = a;
+			for(unsigned int i = 0; i < ptsx.size(); i++){
+				double diffx = ptsx[i]-px;
+				double diffy = ptsy[i]-py;
+				ptsx[i] = diffx * cos(psi) + diffy * sin(psi);
+				ptsy[i] = diffy * cos(psi) - diffx * sin(psi);
+			}
+			std::vector<double> ptsxV = ptsx;
+			std::vector<double> ptsyV = ptsy;
+			std::vector<double> state;
+
 			double px_l = v * dt;
 			double py_l = 0.0;
 			double psi_l = v * str / Lf * dt;
 			double v_l = v + throttle*dt;
-			
-			state << px_l, py_l, psi_l, v_l; //cte_l, epsi_l;
+			state.push_back(px_l);
+			state.push_back(py_l);
+			state.push_back(psi_l);
+			state.push_back(v_l);
 			std::vector<double> r;
 			r = mpc.Solve(state, ptsxV, ptsyV);
 
@@ -123,22 +185,14 @@ namespace mpnet_local_planner{
 			double throttle_value = r[1]; //r[1]*(1-fabs(steer_value))+0.1;
 			double velocity_value = vel + throttle_value * dt;  
 			if(verbose){
-				// for (unsigned int i = 0; i < ptsx.size(); i++){
-				// 	ROS_INFO("[%f],[%f]\n", ptsx.at(i),ptsy.at(i));
-				// }
 				ROS_INFO("sta: [%f], v:[%f], a:[%f]", steer_value, velocity_value, throttle_value);
-				ROS_INFO("x: [%f], y:[%f], th:[%f]", x, y, th);
 			}
-			// _ackermann_msg.drive.steering_angle = steer_value;
-			// _ackermann_msg.drive.speed = velocity_value;
-			// _ackermann_msg.drive.acceleration = throttle_value;//throttle_value;
-
-			cmd_vel.linear.x = velocity_value * cos(steer_value + th);
-			cmd_vel.linear.y = velocity_value * sin(steer_value + th);
+			cmd_vel.linear.x = velocity_value * cos(steer_value);
+			cmd_vel.linear.y = 0;
 			cmd_vel.linear.z = 0;
 			cmd_vel.angular.x = 0;
 			cmd_vel.angular.y = 0;
-			cmd_vel.angular.z = velocity_value * tan(steer_value/Lf);
-		}		
-	}
-}
+			cmd_vel.angular.z = velocity_value * sin(steer_value)/Lf;
+		}
+	}// control_cmd_vel
+}//namespace 

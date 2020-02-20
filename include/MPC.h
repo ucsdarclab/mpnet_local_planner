@@ -2,7 +2,6 @@
 #define MPC_H
 
 #include <vector>
-#include "Eigen-3.3/Eigen/Core"
 // for file
 
 
@@ -16,13 +15,13 @@ class MPC {
 
   // Solve the model given an initial state and polynomial coefficients.
   // Return the first actuatotions.
-  vector<double> Solve(Eigen::VectorXd state, Eigen::VectorXd ptsx, Eigen::VectorXd ptsy);
+  vector<double> Solve(std::vector<double> state, std::vector<double> ptsx, std::vector<double>  ptsy);
 };
 
 
 // Set the timestep length and duration
 // const int N = 20;
-const double dt = 0.04;
+const double dt = 0.05;
 
 // This value assumes the model presented in the classroom is used.
 //
@@ -35,10 +34,8 @@ const double dt = 0.04;
 //
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 0.324;
-const int N = 40;
-const double ref_cte = 0;
-const double ref_epsi = 0;
-const double ref_v = 0.1;
+const int N = 40;                 
+const double ref_v = 0.3;
 
 const size_t x_start = 0;
 const size_t y_start = x_start + N;

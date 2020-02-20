@@ -116,14 +116,14 @@ namespace mpnet_local_planner{
 
         // TODO: Check to see goal tolerance
         base_local_planner::Trajectory path;
-        tc_->getPath(start, goal, bounds, path);
+        // tc_->getPath(start, goal, bounds, path);
 
-        geometry_msgs::PoseStamped robot_vel;
-		odom_helper_.getRobotVel(robot_vel);
-		nav_msgs::Odometry base_odom;
-		odom_helper_.getOdom(base_odom);
+        // geometry_msgs::PoseStamped robot_vel;
+		// odom_helper_.getRobotVel(robot_vel);
+		// nav_msgs::Odometry base_odom;
+		// odom_helper_.getOdom(base_odom);
 
-        // controller.observe(odom_helper_);
+        // controller.observe(robot_vel, base_odom);
         // controller.get_path(path);
         // controller.control(cmd_vel);
     }

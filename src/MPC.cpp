@@ -1,15 +1,14 @@
 #include "MPC.h"
 #include <cppad/cppad.hpp>
 #include <cppad/ipopt/solve.hpp>
-#include "Eigen-3.3/Eigen/Core"
 
 using CppAD::AD;
 
 class FG_eval {
  public:
   // Fitted polynomial coefficients
-  Eigen::VectorXd tgx, tgy;
-  FG_eval(Eigen::VectorXd ptsx, Eigen::VectorXd ptsy) { 
+  std::vector<double> tgx, tgy;
+  FG_eval(std::vector<double> ptsx, std::vector<double> ptsy) { 
     this -> tgx = ptsx;
     this -> tgy = ptsy; 
   }
@@ -21,12 +20,16 @@ class FG_eval {
       // fg[0] += 100.0*CppAD::pow(vars[epsi_start + t], 2);
       fg[0] += 500 *CppAD::pow(vars[x_start + t]-tgx[t], 2);
       fg[0] += 500 *CppAD::pow(vars[y_start + t]-tgy[t], 2);
-      fg[0] += 50*CppAD::pow(vars[v_start + t]- ref_v, 2);
+      fg[0] += 250 *CppAD::pow(vars[v_start + t]- ref_v, 2);
       // fg[0] += 10*(CppAD::pow(vars[x_start + t] - goal[0], 2)+CppAD::pow(vars[y_start + t] - goal[1], 2));
     }
+
+    fg[0] += 500 * CppAD::pow(vars[x_start + N-1]-tgx[N-1], 2);
+    fg[0] += 500 * CppAD::pow(vars[y_start + N-1]-tgy[N-1], 2);
+
     for (int t = 0; t < N - 1; t++) {
       fg[0] += 10*CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += 1*CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 10*CppAD::pow(vars[a_start + t], 2);
     }
     // for (int t = 0; t < N - 2; t++) {
     //   fg[0] += 0*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
@@ -74,7 +77,7 @@ class FG_eval {
 MPC::MPC() {}
 MPC::~MPC() {}
 
-vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd ptsx, Eigen::VectorXd ptsy) {
+vector<double> MPC::Solve(std::vector<double> state, std::vector<double> ptsx, std::vector<double> ptsy) {
   bool ok = true;
   
   size_t i;
@@ -108,12 +111,12 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd ptsx, Eigen::Ve
 
   for (i = v_start; i < delta_start; i++) {
     vars_lowerbound[i] =  0; 
-    vars_upperbound[i] =  2; 
+    vars_upperbound[i] =  0.4; 
   }
 
   for (i = delta_start; i < a_start; i++) {
-    vars_lowerbound[i] =  -0.5; 
-    vars_upperbound[i] =  0.5; 
+    vars_lowerbound[i] =  -0.4; 
+    vars_upperbound[i] =  0.4; 
   }
 
   // Acceleration/decceleration upper and lower limits.
@@ -156,7 +159,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd ptsx, Eigen::Ve
   options += "Sparse  true        reverse\n";
   // NOTE: Currently the solver has a maximum time limit of 0.5 seconds.
   // Change this as you see fit.
-  options += "Numeric max_cpu_time          0.2\n";
+  options += "Numeric max_cpu_time          0.1\n";
 
   // place to return solution
   CppAD::ipopt::solve_result<Dvector> solution;
