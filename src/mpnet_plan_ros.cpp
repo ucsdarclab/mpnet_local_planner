@@ -16,6 +16,7 @@ namespace mpnet_local_planner{
     tf_(NULL),
     initialized_(false),
     navigation_costmap_ros_(NULL),
+    odom_helper_("odom"),
     tc_(NULL)
     {
         initialize(name, tf, costmap_ros);
@@ -101,8 +102,6 @@ namespace mpnet_local_planner{
         geometry_msgs::PoseStamped drive_cmds;
         drive_cmds.header.frame_id = robot_base_frame_;
 
-        geometry_msgs::PoseStamped robot_vel;
-        // odom_helper_.getRobotVel(robot_vel);
 
         if (transformed_plan.empty())
             return false;
@@ -125,7 +124,14 @@ namespace mpnet_local_planner{
         std::vector<double> spaceBound{6.0, 6.0, M_PI};
         tc_->getPath(global_pose, goal_point, spaceBound, path);
 
+        // geometry_msgs::PoseStamped robot_vel;
+		// odom_helper_.getRobotVel(robot_vel);
+		// nav_msgs::Odometry base_odom;
+		// odom_helper_.getOdom(base_odom);
 
+        // controller.observe(robot_vel, base_odom);
+        // controller.get_path(path);
+        // controller.control(cmd_vel);
     }
 
 }

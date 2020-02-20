@@ -14,6 +14,10 @@
 #include <mpnet_plan.h>
 #include <tf2/utils.h>
 
+#include <Controller.h>
+#include <odometry_helper_ros.h>
+
+
 namespace mpnet_local_planner{
     
     char* MpnetPlanner::cost_translation_table=NULL;
@@ -307,11 +311,15 @@ int main(int argc,char* argv[]) {
     ros::Publisher goal_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/goalpose", 1);
 
     ros::Publisher display_trajectory_pub = n.advertise<nav_msgs::Path>("/mpnet_path",1);
+    ros::Publisher controller_pub = n.advertise<geometry_msgs::Twist>("/mpc_cmd_vel",10);
+    // ros::Publisher controller_pub = n.advertise<ackermann_msgs::AckermannDriveStamped>("/drive", 10);
     nav_msgs::Path gui_path;
 
     std::string global_frame_ = navigation_costmap_ros->getGlobalFrameID();
 
-    std::cout << "global frame: " << global_frame_ << std::endl;
+    mpnet_local_planner::Controller controller;
+    base_local_planner::OdometryHelperRos odom_helper_;
+    odom_helper_.setOdomTopic( "/odom" );
 
     // Waiting for rviz to connect. This prevents data lose
     while (0 == move_robot_pub.getNumSubscribers()) 
@@ -418,10 +426,31 @@ int main(int argc,char* argv[]) {
 
             gui_path.poses[i] = point;
         }
-        display_trajectory_pub.publish(gui_path);
+        geometry_msgs::PoseStamped robot_vel;
+        nav_msgs::Odometry base_odom;
+       
         ros::spinOnce();
+
+        while(n.ok()){
+            display_trajectory_pub.publish(gui_path);
+
+            // std::cout<<"in the loop"<<std::endl;
+            // ackermann_msgs::AckermannDriveStamped msg = ackermann_msgs::AckermannDriveStamped();
+            // msg.header.frame_id = "base_link";
+            // msg.header.stamp = ros::Time::now();
+
+            geometry_msgs::Twist msg;            
+            odom_helper_.getRobotVel(robot_vel);
+            odom_helper_.getOdom(base_odom);
+            controller.observe(robot_vel, base_odom);
+            controller.get_path(path);
+            controller.control_cmd_vel(msg);
+            controller_pub.publish(msg);
+            ros::spinOnce();
+        }   
+        
         rate.sleep();
         // if (navigation_costmap_ros!=NULL)
         //     delete navigation_costmap_ros;
-        }
+    }
 }

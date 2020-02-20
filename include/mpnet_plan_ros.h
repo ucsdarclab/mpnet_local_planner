@@ -22,6 +22,9 @@
 #include <ompl/base/spaces/DubinsStateSpace.h>
 #include <ompl/geometric/SimpleSetup.h>
 
+#include <odometry_helper_ros.h>
+#include <Controller.h>
+
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -108,5 +111,8 @@ namespace mpnet_local_planner{
             bool reached_goal_;
             bool prune_plan_;
             std::vector<geometry_msgs::PoseStamped> global_plan_;
+
+            Controller controller;
+            base_local_planner::OdometryHelperRos odom_helper_;
     };
 }
