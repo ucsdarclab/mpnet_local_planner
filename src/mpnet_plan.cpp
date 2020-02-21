@@ -397,11 +397,6 @@ int main(int argc,char* argv[]) {
         // Define the bound for space
         std::vector<double> spaceBound{6.0, 6.0, M_PI};
 
-        // bool validState =  plan.isStateValid(mpnet_start());
-        // if (validState)
-        //     std::cout << "Feasible Starting position" << std::endl;
-        // ^^ END COLLISION CHECKING
-
         torch::Device device(torch::kCUDA);
 
         // Create a vector of inputs for current/goal states

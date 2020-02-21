@@ -10,8 +10,21 @@
 
 #include <tf2/utils.h>
 
+#include <pluginlib/class_list_macros.h>
+
+// Register this planner
+PLUGINLIB_EXPORT_CLASS(mpnet_local_planner::MpnetLocalPlanner, nav_core::BaseLocalPlanner)
+
 namespace mpnet_local_planner{
 
+    MpnetLocalPlanner::MpnetLocalPlanner():
+    tf_(NULL),
+    initialized_(false),
+    navigation_costmap_ros_(NULL),
+    odom_helper_("odom"),
+    tc_(NULL)
+    {}
+    
     MpnetLocalPlanner::MpnetLocalPlanner(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros):
     tf_(NULL),
     initialized_(false),
@@ -120,7 +133,7 @@ namespace mpnet_local_planner{
 
         // TODO: Check to see goal tolerance
         base_local_planner::Trajectory path;
-        // Define the bound for space - THIS IS A HACK, need to add this as a class variable
+        // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
         std::vector<double> spaceBound{6.0, 6.0, M_PI};
         tc_->getPath(global_pose, goal_point, spaceBound, path);
 
@@ -134,4 +147,7 @@ namespace mpnet_local_planner{
         // controller.control(cmd_vel);
     }
 
+    bool MpnetLocalPlanner::isGoalReached(){
+        return false;
+    }
 }

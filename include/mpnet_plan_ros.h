@@ -46,7 +46,7 @@ namespace mpnet_local_planner{
             /**
              * @brief Check if the goal pose has been achieved by the local planner
              */
-            bool isGoalReach();
+            bool isGoalReached();
             
             /**
              * @brief Set the plan that the local planner is following
@@ -95,7 +95,6 @@ namespace mpnet_local_planner{
              */
             ~MpnetLocalPlanner();
 
-        protected:
             MpnetLocalPlanner();
 
         private:
