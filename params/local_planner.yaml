@@ -1,0 +1,10 @@
+clearing_rotation_allowed: false
+
+MpnetLocalPlanner:
+  # Goal Tolerance
+  xy_goal_tolerance: 0.1
+  yaw_goal_tolerance: 0.1
+
+  # Replanning parameters
+  xy_replan_tolerance: 1.0
+  

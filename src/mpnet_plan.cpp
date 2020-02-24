@@ -17,6 +17,7 @@
 #include <Controller.h>
 #include <odometry_helper_ros.h>
 
+#include <angles/angles.h>
 
 namespace mpnet_local_planner{
     
@@ -34,7 +35,9 @@ namespace mpnet_local_planner{
     space(std::make_shared<ob::DubinsStateSpace>(0.58)),
     bounds(NULL),
     si(NULL),
-    initialized_(false)
+    initialized_(false),
+    g_tolerance(0.50),
+    yaw_tolerance(0.1)
     {
         if (~isInitialized())
         {
@@ -70,6 +73,7 @@ namespace mpnet_local_planner{
             navigation_costmap_ros = costmap_ros;
             costmap_ = navigation_costmap_ros->getCostmap();
 
+            // TODO: Set map bounds dynamically 
             bounds = new ob::RealVectorBounds(2);
             bounds->setLow(0,0.0);
             bounds->setLow(1,0.0);
@@ -88,6 +92,7 @@ namespace mpnet_local_planner{
             
             module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
             module.to(torch::kCPU);
+
             initialized_ = true;
 
         }
@@ -220,6 +225,11 @@ namespace mpnet_local_planner{
         start_ompl[0] = start.pose.position.x; 
         start_ompl[1] = start.pose.position.y;
         start_ompl[2] = tf2::getYaw(start.pose.orientation);
+        /*     
+        if (isStateValid(start_ompl()))
+        {
+            std::cout << "Valid start state \n";
+        } */
         goal_ompl[0] = goal.pose.position.x ;
         goal_ompl[1] = goal.pose.position.y ;
         goal_ompl[2] = tf2::getYaw(goal.pose.orientation);
@@ -230,8 +240,17 @@ namespace mpnet_local_planner{
         std::vector<double> targetPose;
         // base_local_planner::Trajectory traj(0.0,0.0,0.0,0.0, (unsigned int)10000);
         traj.resetPoints();
+        double xy_distance_from_goal, yaw_from_goal;
         for(int sample=0;sample<100;sample++)
         {
+            og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
+            isGoalValid = pathToGoal.check();
+            if (isGoalValid)
+            {
+                std::cout<< "Valid path found" << std::endl;
+                FinalPathFromStart.append(goal_ompl());
+                break;
+            }
             targetPose = getTargetPoint(start_ompl, goal_ompl, bounds);
             target_pose[0] = targetPose[0];
             target_pose[1] = targetPose[1];
@@ -241,35 +260,33 @@ namespace mpnet_local_planner{
             
             if (isStartValid)
             {
-                std::cout<< "Valid sample point to start" << std::endl;
+                // std::cout<< "Valid sample point to start" << std::endl;
                 FinalPathFromStart.append(target_pose());
                 start_ompl = target_pose;
             }
 
-            og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
-            isGoalValid = pathToGoal.check();
-            if (isGoalValid)
+            xy_distance_from_goal = std::hypot(targetPose[0]-goal_ompl[0], targetPose[1]-goal_ompl[1]);
+            yaw_from_goal = fabs(angles::shortest_angular_distance(targetPose[2], goal_ompl[2]));
+            // if (xy_distance_from_goal <=g_tolerance && yaw_from_goal<=yaw_tolerance && isStartValid)
+            if (xy_distance_from_goal <=g_tolerance)
             {
-                std::cout<< "Valid path found" << std::endl;
+                // std::cout << "Stop early" << std::endl;
+                isGoalValid=true;
                 break;
             }
         }
         
         if (isStartValid && isGoalValid)
-            FinalPathFromStart.append(goal_ompl());
-
-        FinalPathFromStart.interpolate();
-        std::cout << FinalPathFromStart.getStateCount() << std::endl;
-        for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
         {
-            s = FinalPathFromStart.getState(i);
-            traj.addPoint(s[0], s[1], s[2]);
+            FinalPathFromStart.interpolate();
+            std::cout << FinalPathFromStart.getStateCount() << std::endl;
+            for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
+            {
+                s = FinalPathFromStart.getState(i);
+                traj.addPoint(s[0], s[1], s[2]);
+            }
         }
-        std::cout << "Copied function \n";
-        // // return traj;
-        // std::vector<double> test{s[0], s[1], s[2]};
-        // return FinalPathFromStart;
-    } 
+    }
 }
 
 class GetGlobalPath
@@ -434,13 +451,13 @@ int main(int argc,char* argv[]) {
             // msg.header.frame_id = "base_link";
             // msg.header.stamp = ros::Time::now();
 
-            geometry_msgs::Twist msg;            
-            odom_helper_.getRobotVel(robot_vel);
-            odom_helper_.getOdom(base_odom);
-            controller.observe(robot_vel, base_odom);
-            controller.get_path(path);
-            controller.control_cmd_vel(msg);
-            controller_pub.publish(msg);
+            // geometry_msgs::Twist msg;            
+            // odom_helper_.getRobotVel(robot_vel);
+            // odom_helper_.getOdom(base_odom);
+            // controller.observe(robot_vel, base_odom);
+            // controller.get_path(path);
+            // controller.control_cmd_vel(msg);
+            // controller_pub.publish(msg);
             ros::spinOnce();
         }   
         

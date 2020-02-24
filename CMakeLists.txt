@@ -136,9 +136,12 @@ include_directories(
 
 ## Declare a C++ library
 add_library(${PROJECT_NAME}
-   src/mpnet_plan_ros.cpp
    /usr/local/lib
-
+   src/Controller.cpp
+   src/MPC.cpp
+   src/odometry_helper_ros.cpp
+   src/mpnet_plan_ros.cpp
+  src/mpnet_plan.cpp
 )
 
 ## Add cmake target dependencies of the library
@@ -167,6 +170,12 @@ target_link_libraries(${PROJECT_NAME}_node
   ${TORCH_LIBRARIES}
   ipopt
 )
+target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${TORCH_LIBRARIES}
+  ipopt
+)
+
 #target_link_libraries(${PROJECT_NAME}_node "")
 
 set_property(TARGET ${PROJECT_NAME}_node PROPERTY CXX_STANDARD 14)
@@ -174,11 +183,13 @@ if (OMPL_FOUND)
   message("Package found")
   include_directories(${OMPL_INCLUDE_DIRS})
   target_link_libraries (${PROJECT_NAME}_node ${OMPL_LIBRARIES})
+  target_link_libraries (${PROJECT_NAME} ${OMPL_LIBRARIES})
 endif (OMPL_FOUND)
 if (Boost_FOUND)
   message("Found Boost")
   include_directories(${Boost_INCLUDE_DIR})
   target_link_libraries (${PROJECT_NAME}_node ${Boost_LIBRARIES})
+  target_link_libraries (${PROJECT_NAME} ${OMPL_LIBRARIES})
 endif (Boost_FOUND)
 
 #############

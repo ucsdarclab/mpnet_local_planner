@@ -109,5 +109,6 @@ namespace mpnet_local_planner{
         ob::StateSpacePtr space;
         ob::RealVectorBounds* bounds;
         std::shared_ptr<ob::SpaceInformation> si;
+        double g_tolerance, yaw_tolerance; /** @brief The threshold for goal */
     };
 }

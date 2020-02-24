@@ -2,7 +2,6 @@
  * Describing different components of the local planner  
 */ 
 
-
 #include <mpnet_plan_ros.h>
 
 #include <base_local_planner/goal_functions.h>
@@ -22,7 +21,10 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL)
+    tc_(NULL),
+    controller(false),
+    xy_goal_tolerance(0.5),
+    yaw_goal_tolerance(0.05)
     {}
     
     MpnetLocalPlanner::MpnetLocalPlanner(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros):
@@ -30,11 +32,12 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL)
+    xy_goal_tolerance(0.5),
+    yaw_goal_tolerance(0.05),
+    tc_(NULL),
+    controller(false)
     {
         initialize(name, tf, costmap_ros);
-        ros::NodeHandle private_nh("~/"+name);  
-        l_plan_pub_ = private_nh.advertise<nav_msgs::Path>("mpnet_path",1);
     }
 
     MpnetLocalPlanner::~MpnetLocalPlanner()
@@ -50,6 +53,10 @@ namespace mpnet_local_planner{
     {
         if(!isInitialized())
         {
+            ros::NodeHandle private_nh("~/"+name);  
+            l_plan_pub_ = private_nh.advertise<nav_msgs::Path>("local_plan", 1);
+            g_plan_pub_ = private_nh.advertise<nav_msgs::Path>("global_plan", 1);
+
             navigation_costmap_ros_ = costmap_ros;
             costmap_ = navigation_costmap_ros_->getCostmap();
             tf_ = tf;
@@ -82,9 +89,11 @@ namespace mpnet_local_planner{
         }
 
         global_plan_.clear();
+        path.resetPoints();
         global_plan_ = orig_global_plan;
 
         reached_goal_ = false;
+        valid_local_path = false;
         return true;
     }
 
@@ -131,23 +140,89 @@ namespace mpnet_local_planner{
         goal_point.pose.orientation.z = sin(angle/2);
         goal_point.pose.orientation.w = cos(angle/2);
 
-        // TODO: Check to see goal tolerance
-        base_local_planner::Trajectory path;
-        // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
-        std::vector<double> spaceBound{6.0, 6.0, M_PI};
-        tc_->getPath(global_pose, goal_point, spaceBound, path);
+        // Check to see goal tolerance
+        double xydist_from_goal = std::hypot(goal_point.pose.position.x-global_pose.pose.position.x, goal_point.pose.position.y-global_pose.pose.position.y);
+        double global_yaw = tf2::getYaw(global_pose.pose.orientation);
+        double yaw_from_goal = angles::shortest_angular_distance(global_yaw, angle);
+        // if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
+        if (xydist_from_goal<=xy_goal_tolerance)
+        {
+            cmd_vel.linear.x = 0.0;
+            cmd_vel.linear.y = 0.0;
+            cmd_vel.angular.z = 0.0;
+            reached_goal_ = true;
+            valid_local_path = false;
+            return true;
+        }
+        else
+        {
+            // TODO: Check if the global_pose is near the end of the path
+            if (valid_local_path)
+            {
+                double path_end_x, path_end_y, path_end_theta;
+                path.getEndpoint(path_end_x, path_end_y, path_end_theta);
+                double xy_local_thres = std::hypot(path_end_x-global_pose.pose.position.x, path_end_y -global_pose.pose.position.y);
+                if (xy_local_thres<1.0)
+                {
+                    valid_local_path = false;
+                }   
+            }
+            if (!valid_local_path)
+            {
+                // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
+                std::vector<double> spaceBound{6.0, 6.0, M_PI};
+                base_local_planner::Trajectory new_path;
+                tc_->getPath(global_pose, goal_point, spaceBound, new_path);
+                if (new_path.getPointsSize()>1) 
+                {
+                    path = new_path;
+                    valid_local_path = true;
+                }
+                else
+                {
+                    // If no new path was found and the old path was empty then return false
+                    if (path.getPointsSize()==0)
+                        ROS_ERROR("Did not find a path in the initial search");
+                        return false;
+                }
+            }
+            for (unsigned int i=0; i < path.getPointsSize(); i++)
+            {
+                double p_x, p_y, p_th;
+                path.getPoint(i, p_x, p_y, p_th);
+                geometry_msgs::PoseStamped pose;
+                pose.header.frame_id = global_frame_;
+                pose.header.stamp = ros::Time::now();
+                pose.pose.position.x = p_x;
+                pose.pose.position.y = p_y;
+                pose.pose.position.z = 0.0;
+                tf2::Quaternion q;
+                q.setRPY(0, 0, p_th);
+                tf2::convert(q, pose.pose.orientation);
+                local_plan.push_back(pose);
+            }
+            geometry_msgs::PoseStamped robot_vel;
+            odom_helper_.getRobotVel(robot_vel);
+            nav_msgs::Odometry base_odom;
+            odom_helper_.getOdom(base_odom);
 
-        // geometry_msgs::PoseStamped robot_vel;
-		// odom_helper_.getRobotVel(robot_vel);
-		// nav_msgs::Odometry base_odom;
-		// odom_helper_.getOdom(base_odom);
+            controller.observe(robot_vel, base_odom);
+            controller.get_path(path);
+            controller.control_cmd_vel(cmd_vel);
+        }
+        // Publish information to the visualizer
+        base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
+        base_local_planner::publishPlan(local_plan, l_plan_pub_);
 
-        // controller.observe(robot_vel, base_odom);
-        // controller.get_path(path);
-        // controller.control(cmd_vel);
+        return true;
     }
 
     bool MpnetLocalPlanner::isGoalReached(){
-        return false;
+        if (!isInitialized())
+        {
+            ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
+            return false;
+        }
+        return reached_goal_;
     }
 }
