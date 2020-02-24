@@ -174,7 +174,7 @@ vector<double> MPC::Solve(std::vector<double> state, std::vector<double> ptsx, s
 
   // Cost
   auto cost = solution.obj_value;
-  std::cout << "Cost " << cost << std::endl;
+  // std::cout << "Cost " << cost << std::endl;
  
   vector<double> result;
   result.push_back(solution.x[delta_start]);

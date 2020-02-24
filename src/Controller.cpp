@@ -1,6 +1,16 @@
 #include "Controller.h"
 namespace mpnet_local_planner{
 
+	Controller::Controller():
+	verbose(true)
+	{}
+
+	Controller::Controller(bool verbose):
+	verbose(verbose)
+	{}
+
+	Controller::~Controller(){}
+
 	void Controller::observe(geometry_msgs::PoseStamped& robot_vel, nav_msgs::Odometry& base_odom)
 	{	
 		
