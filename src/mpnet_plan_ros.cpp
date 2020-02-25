@@ -5,6 +5,8 @@
 #include <mpnet_plan_ros.h>
 
 #include <base_local_planner/goal_functions.h>
+#include <chrono> 
+
 #include <nav_msgs/Path.h>
 
 #include <tf2/utils.h>
@@ -173,7 +175,6 @@ namespace mpnet_local_planner{
                 // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
                 std::vector<double> spaceBound{6.0, 6.0, M_PI};
                 base_local_planner::Trajectory new_path;
-
                 tc_->getPath(global_pose, goal_point, spaceBound, new_path);
                 if (new_path.getPointsSize()>1) 
                 {
@@ -220,10 +221,14 @@ namespace mpnet_local_planner{
             odom_helper_.getRobotVel(robot_vel);
             nav_msgs::Odometry base_odom;
             odom_helper_.getOdom(base_odom);
-
+            // auto start = std::chrono::high_resolution_clock::now();
             controller.observe(robot_vel, base_odom);
             controller.get_path(path);
             controller.control_cmd_vel(cmd_vel);
+            // auto stop = std::chrono::high_resolution_clock::now();
+            // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop-start);
+            // ROS_INFO("Took %ld microseconds to generate trajectories",duration.count());
+
         }
         // Publish information to the visualizer
         base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
