@@ -3,7 +3,7 @@
  */
 
 #include <torch/script.h>
-
+#include <torch/torch.h>
 #include <costmap_2d/costmap_2d.h>
 #include <costmap_2d/costmap_2d_ros.h>
 
@@ -42,10 +42,6 @@ namespace mpnet_local_planner{
          * @brief A function to copy the costmap and pad it with zeros such that the robot is in the center
          * @param x The x co-ordinate of the robot
          * @param y The y co-ordinate of the robot
-         * @param resolution The resolution of the costmap
-         * @param origin_x The x co-ordinate of the local costmap origin
-         * @param origin_y The y co-ordinate of the local costmap origin
-         * @param costmap A pointer to the local costmap
          * @return A padded egocentric costmap
          */
         torch::Tensor copy_costmap( double x, double y);
@@ -116,9 +112,11 @@ namespace mpnet_local_planner{
         costmap_2d::Costmap2D* costmap_, *costmap_collision_;
         base_local_planner::WorldModel* world_model;
         bool initialized_;
+        bool use_gpu;
 
         std::vector<torch::jit::IValue> inputs;
         torch::jit::script::Module module;
+        torch::Device device;
         base_local_planner::Trajectory path;
         ob::StateSpacePtr space;
         ob::RealVectorBounds* bounds;
