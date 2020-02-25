@@ -16,7 +16,11 @@
 
 #include <ompl/base/spaces/DubinsStateSpace.h>
 #include <ompl/base/ScopedState.h>
+
 #include <ompl/geometric/SimpleSetup.h>
+#include <ompl/geometric/SimpleSetup.h>
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -76,11 +80,21 @@ namespace mpnet_local_planner{
         std::vector<double> getTargetPoint(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds);
 
         /**
-         * @brief Returns the path from start to goal
+         * @brief gets the path from start to goal using the loaded network
+         * @param start
+         * @param goal
+         * @param bounds
+         * @param traj
          */
-        // base_local_planner::Trajectory getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds);
-        // void getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj);
         void getPath(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, std::vector<double> bounds, base_local_planner::Trajectory &traj);
+
+        /**
+         * @brief gets the path from start to goal using RRT*
+         * @param start
+         * @param goal
+         * @param traj
+         */
+        void getPathRRT_star(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, base_local_planner::Trajectory &traj);
 
         /**
          * @brief Returns if the given state is in collision or not
@@ -109,6 +123,7 @@ namespace mpnet_local_planner{
         ob::StateSpacePtr space;
         ob::RealVectorBounds* bounds;
         std::shared_ptr<ob::SpaceInformation> si;
+        std::shared_ptr<og::RRTstar> planAlgo;
         double g_tolerance, yaw_tolerance; /** @brief The threshold for goal */
     };
 }

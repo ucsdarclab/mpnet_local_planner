@@ -147,6 +147,7 @@ namespace mpnet_local_planner{
         // if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
         if (xydist_from_goal<=xy_goal_tolerance)
         {
+            ROS_INFO("Reach Goal");
             cmd_vel.linear.x = 0.0;
             cmd_vel.linear.y = 0.0;
             cmd_vel.angular.z = 0.0;
@@ -172,6 +173,7 @@ namespace mpnet_local_planner{
                 // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
                 std::vector<double> spaceBound{6.0, 6.0, M_PI};
                 base_local_planner::Trajectory new_path;
+
                 tc_->getPath(global_pose, goal_point, spaceBound, new_path);
                 if (new_path.getPointsSize()>1) 
                 {
@@ -180,12 +182,25 @@ namespace mpnet_local_planner{
                 }
                 else
                 {
-                    // If no new path was found and the old path was empty then return false
-                    if (path.getPointsSize()==0)
-                        ROS_ERROR("Did not find a path in the initial search");
-                        return false;
+                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                    if (new_path.getPointsSize()>1)
+                    {
+                        ROS_INFO("Path from RRT star");
+                        path = new_path;
+                        valid_local_path = true;
+                    }
+                    else
+                    {
+                        // If no new path was found and the old path was empty then return false
+                        if (path.getPointsSize()==0)
+                        {
+                            ROS_ERROR("Did not find a path in the initial search");
+                            return false;        
+                        }
+                    }
                 }
             }
+        
             for (unsigned int i=0; i < path.getPointsSize(); i++)
             {
                 double p_x, p_y, p_th;

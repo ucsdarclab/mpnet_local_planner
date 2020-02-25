@@ -37,7 +37,8 @@ namespace mpnet_local_planner{
     si(NULL),
     initialized_(false),
     g_tolerance(0.50),
-    yaw_tolerance(0.1)
+    yaw_tolerance(0.1),
+    planAlgo(NULL)
     {
         if (~isInitialized())
         {
@@ -90,6 +91,9 @@ namespace mpnet_local_planner{
             }
             );
             
+            planAlgo = std::make_shared<og::RRTstar>(si);
+            planAlgo->setRange(0.2);
+            planAlgo->setTreePruning(true);
             module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
             module.to(torch::kCPU);
 
@@ -219,7 +223,6 @@ namespace mpnet_local_planner{
     // void MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
     void MpnetPlanner::getPath(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
     {
-        og::PathGeometric omplPath(si);
         // Convert poseStamped to Scoped state
         ob::ScopedState<> start_ompl(space), goal_ompl(space);
         start_ompl[0] = start.pose.position.x; 
@@ -241,7 +244,7 @@ namespace mpnet_local_planner{
         // base_local_planner::Trajectory traj(0.0,0.0,0.0,0.0, (unsigned int)10000);
         traj.resetPoints();
         double xy_distance_from_goal, yaw_from_goal;
-        for(int sample=0;sample<100;sample++)
+        for(int sample=0;sample<10;sample++)
         {
             og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
             isGoalValid = pathToGoal.check();
@@ -276,8 +279,49 @@ namespace mpnet_local_planner{
             }
         }
         
-        if (isStartValid && isGoalValid)
+        if (isGoalValid)
         {
+            FinalPathFromStart.interpolate();
+            // std::cout << FinalPathFromStart.getStateCount() << std::endl;
+            // TODO: Maybe this can be made faster?
+            for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
+            {
+                s = FinalPathFromStart.getState(i);
+                traj.addPoint(s[0], s[1], s[2]);
+            }
+        }
+    }
+
+    void MpnetPlanner::getPathRRT_star(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, base_local_planner::Trajectory &traj)
+    {
+        og::SimpleSetup ss(si);
+        /* 
+        ss.setStateValidityChecker([this](const ob::State *state) -> bool
+        {
+            return this->isStateValid(state);
+        });
+ */
+        ob::ScopedState<> start_ompl(space), goal_ompl(space), s(space);
+        start_ompl[0] = start.pose.position.x; 
+        start_ompl[1] = start.pose.position.y;
+        start_ompl[2] = tf2::getYaw(start.pose.orientation);
+
+        goal_ompl[0] = goal.pose.position.x ;
+        goal_ompl[1] = goal.pose.position.y ;
+        goal_ompl[2] = tf2::getYaw(goal.pose.orientation);
+
+        planAlgo->clear();
+        ss.setStartAndGoalStates(start_ompl, goal_ompl);
+        ss.setPlanner(planAlgo);
+        // std::cout << "The range of the planner : " << planAlgo->getRange();
+
+        ob::PlannerStatus solved = ss.solve(0.05);
+        traj.resetPoints();
+
+        if (ss.haveSolutionPath())
+        {
+            ss.simplifySolution(0.05);
+            og::PathGeometric FinalPathFromStart = ss.getSolutionPath();
             FinalPathFromStart.interpolate();
             std::cout << FinalPathFromStart.getStateCount() << std::endl;
             for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
@@ -286,6 +330,7 @@ namespace mpnet_local_planner{
                 traj.addPoint(s[0], s[1], s[2]);
             }
         }
+
     }
 }
 
