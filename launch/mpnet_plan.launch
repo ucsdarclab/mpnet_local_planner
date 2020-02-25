@@ -13,4 +13,6 @@
     <rosparam file="$(find racecar_simulator)/params/global_costmap_param.yaml" command="load" /> 
     <rosparam file="$(find mpnet_plan)/params/collision_costmap_param.yaml" command="load" /> 
   </node>
+
+  <node pkg="mpnet_plan" name="test_controller" type="test_controller.py" output="screen"/> 
 </launch>
