@@ -38,7 +38,9 @@ namespace mpnet_local_planner{
     initialized_(false),
     g_tolerance(0.50),
     yaw_tolerance(0.1),
-    planAlgo(NULL)
+    planAlgo(NULL),
+    device(torch::kCPU),
+    use_gpu(true)
     {
         if (~isInitialized())
         {
@@ -95,14 +97,27 @@ namespace mpnet_local_planner{
             planAlgo->setRange(0.2);
             planAlgo->setTreePruning(true);
             module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
-            module.to(torch::kCPU);
+            if (~torch::cuda::is_available())
+            {
+                use_gpu = false;
+                ROS_INFO("Did not find CUDA, setting device to CPU");
+            }
+            if (~use_gpu)
+            {
+                module.to(torch::kCPU);
+            }
+            else
+            {
+                device = torch::Device(torch::kCUDA);
+            }
+            
 
             initialized_ = true;
 
         }
         else
         {
-            ROS_WARN("The core planner ahs already been initialized, doing nothing");
+            ROS_WARN("The core planner has already been initialized, doing nothing");
         }
     }
 
@@ -199,12 +214,22 @@ namespace mpnet_local_planner{
     {
         torch::NoGradGuard no_grad;
         torch::Tensor input_vector = copy_pose(start, goal, bounds);
+        input_vector.to(device);
         inputs.push_back(input_vector);
-
+        // torch::Tensor costmap = torch::full({1,1,80,80}, 1);
+        auto start_time = std::chrono::high_resolution_clock::now();
         torch::Tensor costmap = copy_costmap(start[0], start[1]);
+        // copy_costmap(start[0], start[1], costmap);
+        auto stop_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+        ROS_INFO("Time taken to copy : %ld microseconds", duration.count());
+        costmap.to(device);
         inputs.push_back(costmap);
 
         at::Tensor output = module.forward(inputs).toTensor();
+        if (use_gpu)
+            output = output.to(torch::kCPU);
+
         std::vector<double> targetPoint = getMapPoint(output, bounds);
         inputs.clear();
         return targetPoint;
@@ -464,7 +489,12 @@ int main(int argc,char* argv[]) {
         // Create a vector of inputs for current/goal states
         geometry_msgs::PoseWithCovarianceStamped targetPoint;
         base_local_planner::Trajectory path;
+        auto start_time = std::chrono::high_resolution_clock::now();
         plan.getPath(global_pose, goal_point, spaceBound, path);
+        auto stop_time = std::chrono::high_resolution_clock::now();
+        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+        ROS_INFO("Time taken to plan : %ld microseconds", duration.count());
+
         // Publish the message
         gui_path.header.frame_id = "/map";
         gui_path.poses.resize(path.getPointsSize());
