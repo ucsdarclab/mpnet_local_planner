@@ -6,7 +6,8 @@
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/building_31.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_1f_full_tuned_edit.yaml"/>-->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_6f_icra2019_fx_net.yaml"/> -->
-  <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2.yaml"/>
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2.yaml"/> -->
+  <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/>
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/narrowPassage.yaml"/> -->
 
 
@@ -35,7 +36,7 @@
     <rosparam file="$(find racecar_simulator)/params/global_costmap_param.yaml" command="load" /> 
     <rosparam file="$(find mpnet_plan)/params/collision_costmap_param.yaml" command="load" /> 
     <param name="base_local_planner" value="mpnet_local_planner/MpnetLocalPlanner" />
-    <param name="controller_frequency" value="5.0"/>
+    <param name="controller_frequency" value="10.0"/>
     <param name="controller_patience" value="15.0"/>
 
     <rosparam file="$(find mpnet_plan)/params/local_planner.yaml" command="load" />
