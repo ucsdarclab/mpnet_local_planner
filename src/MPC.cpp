@@ -20,7 +20,7 @@ class FG_eval {
       // fg[0] += 100.0*CppAD::pow(vars[epsi_start + t], 2);
       fg[0] += 500 *CppAD::pow(vars[x_start + t]-tgx[t], 2);
       fg[0] += 500 *CppAD::pow(vars[y_start + t]-tgy[t], 2);
-      fg[0] += 250 *CppAD::pow(vars[v_start + t]- ref_v, 2);
+      fg[0] += 100 *CppAD::pow(vars[v_start + t]- ref_v, 2);
       // fg[0] += 10*(CppAD::pow(vars[x_start + t] - goal[0], 2)+CppAD::pow(vars[y_start + t] - goal[1], 2));
     }
 
@@ -28,13 +28,14 @@ class FG_eval {
     fg[0] += 500 * CppAD::pow(vars[y_start + N-1]-tgy[N-1], 2);
 
     for (int t = 0; t < N - 1; t++) {
-      fg[0] += 10*CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += 10*CppAD::pow(vars[a_start + t], 2);
+      fg[0] += 1*CppAD::pow(vars[delta_start + t], 2);
+      fg[0] += 1*CppAD::pow(vars[a_start + t], 2);
     }
-    // for (int t = 0; t < N - 2; t++) {
-    //   fg[0] += 0*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-    //   fg[0] += 0*CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
-    // }
+
+    for (int t = 0; t < N - 2; t++) {
+      fg[0] += 50*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 10*CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+    }
     // terminal loss
     fg[1 + x_start] = vars[x_start];
     fg[1 + y_start] = vars[y_start];
@@ -111,12 +112,12 @@ vector<double> MPC::Solve(std::vector<double> state, std::vector<double> ptsx, s
 
   for (i = v_start; i < delta_start; i++) {
     vars_lowerbound[i] =  0; 
-    vars_upperbound[i] =  0.4; 
+    vars_upperbound[i] =  0.2; 
   }
 
   for (i = delta_start; i < a_start; i++) {
-    vars_lowerbound[i] =  -0.4; 
-    vars_upperbound[i] =  0.4; 
+    vars_lowerbound[i] =  -0.5; 
+    vars_upperbound[i] =  0.5; 
   }
 
   // Acceleration/decceleration upper and lower limits.
