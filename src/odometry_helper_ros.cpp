@@ -34,12 +34,12 @@
  *
  * Author: TKruse
  *********************************************************************/
-#include <base_local_planner/odometry_helper_ros.h>
+#include <odometry_helper_ros.h>
 #include <tf2/LinearMath/Quaternion.h>
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <tf2/convert.h>
 
-namespace base_local_planner {
+namespace mpnet_local_planner {
 
 OdometryHelperRos::OdometryHelperRos(std::string odom_topic) {
   setOdomTopic( odom_topic );

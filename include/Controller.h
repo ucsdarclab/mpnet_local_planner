@@ -11,8 +11,8 @@
 #include "nav_msgs/Path.h"
 #include "geometry_msgs/PoseStamped.h"
 #include "geometry_msgs/Pose.h"
-#include <base_local_planner/odometry_helper_ros.h>
 #include <base_local_planner/trajectory.h>
+#include <odometry_helper_ros.h>
 #include <tf2/utils.h>
 
 // for MPC
@@ -36,7 +36,8 @@ namespace mpnet_local_planner{
 		/**
 		 * @brief: 
 		 */
-		void get_path(base_local_planner::Trajectory& traj);
+		void get_path(const nav_msgs::Path::ConstPtr& msg);
+
 		// void control(geometry_msgs::Twist& cmd_vel);
 		/**
 		 * @brief: 

@@ -43,7 +43,7 @@
 #include <boost/thread.hpp>
 #include <geometry_msgs/PoseStamped.h>
 
-namespace base_local_planner {
+namespace mpnet_local_planner {
 
 class OdometryHelperRos {
 public:

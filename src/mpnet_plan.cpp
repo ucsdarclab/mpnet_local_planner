@@ -405,7 +405,7 @@ int main(int argc,char* argv[]) {
     std::string global_frame_ = navigation_costmap_ros->getGlobalFrameID();
 
     mpnet_local_planner::Controller controller;
-    base_local_planner::OdometryHelperRos odom_helper_;
+    mpnet_local_planner::OdometryHelperRos odom_helper_;
     odom_helper_.setOdomTopic( "/odom" );
 
     // Waiting for rviz to connect. This prevents data lose

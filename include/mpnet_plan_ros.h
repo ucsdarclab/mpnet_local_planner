@@ -117,6 +117,6 @@ namespace mpnet_local_planner{
 
 
             Controller controller;
-            base_local_planner::OdometryHelperRos odom_helper_;
+            OdometryHelperRos odom_helper_;
     };
 }
