@@ -153,6 +153,7 @@ add_library(${PROJECT_NAME}
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 add_executable(${PROJECT_NAME}_node src/mpnet_plan.cpp src/Controller.cpp src/MPC.cpp src/odometry_helper_ros.cpp)
+add_executable(controller_node src/controller_node.cpp src/Controller.cpp src/MPC.cpp src/odometry_helper_ros.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -191,6 +192,11 @@ if (Boost_FOUND)
   target_link_libraries (${PROJECT_NAME}_node ${Boost_LIBRARIES})
   target_link_libraries (${PROJECT_NAME} ${OMPL_LIBRARIES})
 endif (Boost_FOUND)
+
+target_link_libraries(controller_node
+  ${catkin_LIBRARIES}
+  ipopt
+)
 
 #############
 ## Install ##

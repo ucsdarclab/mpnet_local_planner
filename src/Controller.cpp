@@ -26,6 +26,50 @@ namespace mpnet_local_planner{
 		// ROS_INFO("x: [%f], y:[%f], th:[%f]", x, y, th);
 	}
 
+	void Controller::get_path(const nav_msgs::Path::ConstPtr& msg)
+	{
+		std::vector<geometry_msgs::PoseStamped> poses = msg->poses;
+		// std::cout<<poses.size()<<std::endl;
+		// int k = 2;
+		int k = 4;
+		int length = poses.size()>(std::size_t)(N*k) ? N: poses.size(), start = 0;
+		
+		double min = 1e10;
+
+		double xi = 0., yi = 0., tmp = 0.;
+		for(unsigned int i = 0; i< poses.size(); i++){
+			xi = poses.at(i).pose.position.x;
+			yi = poses.at(i).pose.position.y;
+			tmp = (x-xi)*(x-xi) + (y-yi) * (y-yi);
+			if(tmp < min){
+				start = i;
+				min = tmp;
+			}
+			if((std::size_t)(start+length*k) > poses.size()){
+					length = (poses.size() - start) / k;
+			}
+
+			// if(start > curr){
+			// 	curr = start;
+			// }
+			curr = start;
+			path_goal.at(0) = poses.back().pose.position.x;
+			path_goal.at(1) = poses.back().pose.position.y;
+		}
+
+		
+		
+		path_x = std::vector<double>(length);
+		path_y = std::vector<double>(length); 
+		
+		for (int i = 0; i < length; i++)
+		{
+			path_x.at(i) = poses.at(i*k+curr).pose.position.x;
+			path_y.at(i) = poses.at(i*k+curr).pose.position.y;
+		}
+	}
+
+/* 
 	void Controller::get_path(base_local_planner::Trajectory& traj)
 	{
 		// std::cout<<traj.getPointsSize()<<std::endl;
@@ -62,7 +106,7 @@ namespace mpnet_local_planner{
 	}
 
 
-	void Controller::control(ackermann_msgs::AckermannDriveStamped& _ackermann_msg){
+ */	void Controller::control(ackermann_msgs::AckermannDriveStamped& _ackermann_msg){
 		// deal with path
 		if(verbose){
 			// for (unsigned int i = 0; i < ptsx.size(); i++){
@@ -107,10 +151,14 @@ namespace mpnet_local_planner{
 			std::vector<double> ptsyV = ptsy;
 			std::vector<double> state;
 
-			double px_l = /*v*/ 0.3 * dt;
+			// double px_l = /*v*/ 0.3 * dt;
+			// double py_l = 0.0;
+			// double psi_l = /*v*/ 0.3 * str / Lf * dt;
+			// double v_l = 0.3;//v + throttle*dt;
+			double px_l = v * dt;
 			double py_l = 0.0;
-			double psi_l = /*v*/ 0.3 * str / Lf * dt;
-			double v_l = 0.3;//v + throttle*dt;
+			double psi_l = v * str / Lf * dt;
+			double v_l = v + throttle*dt;
 			state.push_back(px_l);
 			state.push_back(py_l);
 			state.push_back(psi_l);

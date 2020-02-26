@@ -217,22 +217,27 @@ namespace mpnet_local_planner{
                 tf2::convert(q, pose.pose.orientation);
                 local_plan.push_back(pose);
             }
-            geometry_msgs::PoseStamped robot_vel;
-            odom_helper_.getRobotVel(robot_vel);
-            nav_msgs::Odometry base_odom;
-            odom_helper_.getOdom(base_odom);
+            // geometry_msgs::PoseStamped robot_vel;
+            // odom_helper_.getRobotVel(robot_vel);
+            // nav_msgs::Odometry base_odom;
+            // odom_helper_.getOdom(base_odom);
             // auto start = std::chrono::high_resolution_clock::now();
-            controller.observe(robot_vel, base_odom);
-            controller.get_path(path);
-            controller.control_cmd_vel(cmd_vel);
+            // controller.observe(robot_vel, base_odom);
+            // controller.get_path(path);
+            // controller.control_cmd_vel(cmd_vel);
             // auto stop = std::chrono::high_resolution_clock::now();
             // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop-start);
             // ROS_INFO("Took %ld microseconds to generate trajectories",duration.count());
 
         }
+        base_local_planner::prunePlan(global_pose, local_plan, global_plan_);
         // Publish information to the visualizer
         base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
         base_local_planner::publishPlan(local_plan, l_plan_pub_);
+
+        cmd_vel.linear.x = 0.0;
+        cmd_vel.linear.y = 0.0;
+        cmd_vel.angular.z = 0.0;
 
         return true;
     }
