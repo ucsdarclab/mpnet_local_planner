@@ -24,9 +24,7 @@ namespace mpnet_local_planner{
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
     tc_(NULL),
-    controller(false),
-    xy_goal_tolerance(0.1),
-    yaw_goal_tolerance(0.05)
+    controller(false)
     {}
     
     MpnetLocalPlanner::MpnetLocalPlanner(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros):
