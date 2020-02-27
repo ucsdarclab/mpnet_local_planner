@@ -183,7 +183,8 @@ namespace mpnet_local_planner{
 
 			double steer_value = r[0]; /// (deg2rad(25)*Lf);
 			double throttle_value = r[1]; //r[1]*(1-fabs(steer_value))+0.1;
-			double velocity_value = vel + throttle_value * dt;  
+			// double velocity_value = vel + throttle_value * dt;  
+			double velocity_value = ref_v;
 			if(verbose){
 				ROS_INFO("sta: [%f], v:[%f], a:[%f]", steer_value, velocity_value, throttle_value);
 			}
