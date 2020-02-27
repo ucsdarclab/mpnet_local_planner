@@ -25,7 +25,12 @@ namespace mpnet_local_planner{
     
     // MpnetPlanner::MpnetPlanner(){}
     
-    MpnetPlanner::MpnetPlanner(tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS *costmap_ros):
+    MpnetPlanner::MpnetPlanner(
+        tf2_ros::Buffer* tf, 
+        costmap_2d::Costmap2DROS *costmap_ros, 
+        const std::string& file_name,
+        double xy_tolerance,
+        double yaw_tolerance):
     tf_(NULL),
     navigation_costmap_ros(NULL),
     collision_costmap_ros(NULL),
@@ -36,8 +41,8 @@ namespace mpnet_local_planner{
     bounds(NULL),
     si(NULL),
     initialized_(false),
-    g_tolerance(0.50),
-    yaw_tolerance(0.1),
+    g_tolerance(g_tolerance),
+    yaw_tolerance(yaw_tolerance),
     planAlgo(NULL),
     device(torch::kCPU),
     use_gpu(true)
@@ -104,7 +109,7 @@ namespace mpnet_local_planner{
             planAlgo->setTreePruning(true);
 
             // module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
-            module = torch::jit::load("/root/data/mymap/trained_models/mpnet_model_299.pt");
+            module = torch::jit::load(file_name);
             if (!torch::cuda::is_available())
             {
                 use_gpu = false;
@@ -407,7 +412,8 @@ int main(int argc,char* argv[]) {
     costmap_2d::Costmap2DROS *navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap",  buffer);
     navigation_costmap_ros->pause();
     costmap_2d::Costmap2D *costmap_ = navigation_costmap_ros->getCostmap();
-    mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros);
+    std::string filename = "/root/data/mymap/mpnet_epoch_299.pt";
+    mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros, filename, 0.1, 0.2);
     navigation_costmap_ros->start();
     // -- FOR TESTING PURPOSES - setting start and goal location --
 

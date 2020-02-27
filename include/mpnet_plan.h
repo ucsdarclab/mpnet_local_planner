@@ -31,10 +31,19 @@ namespace mpnet_local_planner{
         public:
         /**
          * @brief A default initializer
+         * @param tf
+         * @param costmap_ros
+         * @param file_name
          */
         // MpnetPlanner();
 
-        MpnetPlanner(tf2_ros::Buffer *tf, costmap_2d::Costmap2DROS *costmap_ros);
+        MpnetPlanner(
+            tf2_ros::Buffer *tf, 
+            costmap_2d::Costmap2DROS *costmap_ros, 
+            const std::string& file_name,
+            double xy_tolerance,
+            double yaw_tolerance
+            );
 
         ~MpnetPlanner();
 

@@ -1,6 +1,9 @@
 clearing_rotation_allowed: false
 
 MpnetLocalPlanner:
+  # Model file location
+  model_file: /root/data/mymap/trained_models/mpnet_model_299.pt
+
   # Goal Tolerance
   xy_goal_tolerance: 0.1
   yaw_goal_tolerance: 0.1

@@ -25,7 +25,7 @@ namespace mpnet_local_planner{
     odom_helper_("odom"),
     tc_(NULL),
     controller(false),
-    xy_goal_tolerance(0.5),
+    xy_goal_tolerance(0.1),
     yaw_goal_tolerance(0.05)
     {}
     
@@ -34,8 +34,6 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    xy_goal_tolerance(0.5),
-    yaw_goal_tolerance(0.05),
     tc_(NULL),
     controller(false)
     {
@@ -63,18 +61,30 @@ namespace mpnet_local_planner{
             costmap_ = navigation_costmap_ros_->getCostmap();
             tf_ = tf;
             // ---------Set parameters of the model ----------------
-            // TODO: Load network model from reading the parameter file
-            // private_nh.param("file_name", <file_name>, <default value>);
+            // Load network model from reading the parameter file
+            std::string file_name;
+            double g_tolerance, yaw_tolerance;
+            if (private_nh.getParam("model_file", file_name))
+            {
+                prune_plan_ = true;
+                global_frame_ = costmap_ros->getGlobalFrameID();
+                robot_base_frame_ = costmap_ros->getBaseFrameID();
+                private_nh.param<double>("xy_goal_tolerance", g_tolerance, 0.1);
+                private_nh.param<double>("yaw_goal_tolerance", yaw_tolerance, 0.2);
+                xy_goal_tolerance = g_tolerance;
+                yaw_goal_tolerance = yaw_tolerance;
+                initialized_ = true;
 
-            // TODO: Come up with a strategy to send controller frequency commands
-            
-            prune_plan_ = true;
-            // ^^ Set the parameters of the model using param file
-            global_frame_ = costmap_ros->getGlobalFrameID();
-            robot_base_frame_ = costmap_ros->getBaseFrameID();
-            
-            tc_ = new MpnetPlanner(tf, navigation_costmap_ros_);
-            initialized_ = true;
+                tc_ = new MpnetPlanner(
+                    tf, 
+                    navigation_costmap_ros_, 
+                    file_name,
+                    xy_goal_tolerance,
+                    yaw_goal_tolerance
+                    );
+            }
+            else
+                ROS_ERROR("No model file specified, Did not initialize planner");            
         }
         else
         {
