@@ -175,7 +175,13 @@ namespace mpnet_local_planner{
                 // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
                 std::vector<double> spaceBound{6.0, 6.0, M_PI};
                 base_local_planner::Trajectory new_path;
+                auto start_time = std::chrono::high_resolution_clock::now();
                 tc_->getPath(global_pose, goal_point, spaceBound, new_path);
+                auto stop_time = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+                ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+                // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
+
                 if (new_path.getPointsSize()>1) 
                 {
                     path = new_path;
@@ -183,22 +189,23 @@ namespace mpnet_local_planner{
                 }
                 else
                 {
-                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
-                    if (new_path.getPointsSize()>1)
-                    {
-                        ROS_INFO("Path from RRT star");
-                        path = new_path;
-                        valid_local_path = true;
-                    }
-                    else
-                    {
+                    // tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                    // if (new_path.getPointsSize()>1)
+                    // {
+                    //     ROS_INFO("Path from RRT star");
+                    //     path = new_path;
+                    //     valid_local_path = true;
+                    // }
+                    // else
+                    // {
+                        // ROS_INFO("Number of points in path : %ud",path.getPointsSize());
                         // If no new path was found and the old path was empty then return false
                         if (path.getPointsSize()==0)
                         {
-                            ROS_ERROR("Did not find a path in the initial search");
+                            ROS_INFO("Did not find a path in the initial search");
                             return false;        
                         }
-                    }
+                    // }
                 }
             }
         
@@ -230,7 +237,6 @@ namespace mpnet_local_planner{
             // ROS_INFO("Took %ld microseconds to generate trajectories",duration.count());
 
         }
-        base_local_planner::prunePlan(global_pose, local_plan, global_plan_);
         // Publish information to the visualizer
         base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
         base_local_planner::publishPlan(local_plan, l_plan_pub_);

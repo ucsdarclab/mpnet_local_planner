@@ -78,11 +78,17 @@ namespace mpnet_local_planner{
 
             // TODO: Set map bounds dynamically 
             bounds = new ob::RealVectorBounds(2);
-            bounds->setLow(0,0.0);
-            bounds->setLow(1,0.0);
+            // bounds->setLow(0,0.0);
+            // bounds->setLow(1,0.0);
+            // bounds->setHigh(0,27.0);
+            // bounds->setHigh(1,27.0);
+            
+            bounds->setLow(0,-1.8);
+            bounds->setLow(1,-2.1);
+            bounds->setHigh(0,4.0);
+            bounds->setHigh(1,9.25);
+            
             bounds->setLow(2,-M_PI);
-            bounds->setHigh(0,27.0);
-            bounds->setHigh(1,27.0);
             bounds->setHigh(2,M_PI);
             space->as<ob::SE2StateSpace>()->setBounds(*bounds);
             space->setLongestValidSegmentFraction(0.0005);
@@ -96,19 +102,23 @@ namespace mpnet_local_planner{
             planAlgo = std::make_shared<og::RRTstar>(si);
             planAlgo->setRange(0.2);
             planAlgo->setTreePruning(true);
-            module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
-            if (~torch::cuda::is_available())
+
+            // module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
+            module = torch::jit::load("/root/data/mymap/trained_models/mpnet_model_299.pt");
+            if (!torch::cuda::is_available())
             {
                 use_gpu = false;
                 ROS_INFO("Did not find CUDA, setting device to CPU");
             }
-            if (~use_gpu)
+
+            if (!use_gpu)
             {
                 module.to(torch::kCPU);
             }
             else
             {
                 device = torch::Device(torch::kCUDA);
+                ROS_INFO("Using GPU");
             }
             
 
@@ -214,17 +224,15 @@ namespace mpnet_local_planner{
     {
         torch::NoGradGuard no_grad;
         torch::Tensor input_vector = copy_pose(start, goal, bounds);
-        input_vector.to(device);
-        inputs.push_back(input_vector);
+        inputs.push_back(input_vector.to(device));
         // torch::Tensor costmap = torch::full({1,1,80,80}, 1);
-        auto start_time = std::chrono::high_resolution_clock::now();
+        // auto start_time = std::chrono::high_resolution_clock::now();
         torch::Tensor costmap = copy_costmap(start[0], start[1]);
         // copy_costmap(start[0], start[1], costmap);
-        auto stop_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-        ROS_INFO("Time taken to copy : %ld microseconds", duration.count());
-        costmap.to(device);
-        inputs.push_back(costmap);
+        // auto stop_time = std::chrono::high_resolution_clock::now();
+        // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+        // ROS_INFO("Time taken to copy : %ld microseconds", duration.count());
+        inputs.push_back(costmap.to(device));
 
         at::Tensor output = module.forward(inputs).toTensor();
         if (use_gpu)
@@ -234,6 +242,7 @@ namespace mpnet_local_planner{
         inputs.clear();
         return targetPoint;
     }
+
 
     bool MpnetPlanner::isStateValid(const ob::State *state)
     {
@@ -248,6 +257,7 @@ namespace mpnet_local_planner{
     // void MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
     void MpnetPlanner::getPath(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
     {
+
         // Convert poseStamped to Scoped state
         ob::ScopedState<> start_ompl(space), goal_ompl(space);
         start_ompl[0] = start.pose.position.x; 
@@ -268,42 +278,50 @@ namespace mpnet_local_planner{
         std::vector<double> targetPose;
         // base_local_planner::Trajectory traj(0.0,0.0,0.0,0.0, (unsigned int)10000);
         traj.resetPoints();
+        ob::ScopedState<> reset_ompl(space, start_ompl());
         double xy_distance_from_goal, yaw_from_goal;
-        for(int sample=0;sample<10;sample++)
+        for(int numPlan=0; numPlan<2; numPlan++)
         {
-            og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
-            isGoalValid = pathToGoal.check();
-            if (isGoalValid)
+            start_ompl=reset_ompl;
+            FinalPathFromStart.clear();
+            FinalPathFromStart.append(start_ompl());
+            for(int sample=0;sample<4;sample++)
             {
-                std::cout<< "Valid path found" << std::endl;
-                FinalPathFromStart.append(goal_ompl());
-                break;
-            }
-            targetPose = getTargetPoint(start_ompl, goal_ompl, bounds);
-            target_pose[0] = targetPose[0];
-            target_pose[1] = targetPose[1];
-            target_pose[2] = targetPose[2];
-            og::PathGeometric pathFromStart=og::PathGeometric(si, start_ompl(), target_pose());
-            isStartValid = pathFromStart.check();
-            
-            if (isStartValid)
-            {
-                // std::cout<< "Valid sample point to start" << std::endl;
-                FinalPathFromStart.append(target_pose());
-                start_ompl = target_pose;
-            }
+                og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
+                isGoalValid = pathToGoal.check();
+                if (isGoalValid)
+                {
+                    std::cout<< "Valid path found" << std::endl;
+                    FinalPathFromStart.append(goal_ompl());
+                    break;
+                }
+                targetPose = getTargetPoint(start_ompl, goal_ompl, bounds);
+                target_pose[0] = targetPose[0];
+                target_pose[1] = targetPose[1];
+                target_pose[2] = targetPose[2];
+                og::PathGeometric pathFromStart=og::PathGeometric(si, start_ompl(), target_pose());
+                isStartValid = pathFromStart.check();
+                
+                if (isStartValid)
+                {
+                    // std::cout<< "Valid sample point to start" << std::endl;
+                    FinalPathFromStart.append(target_pose());
+                    start_ompl = target_pose;
+                }
 
-            xy_distance_from_goal = std::hypot(targetPose[0]-goal_ompl[0], targetPose[1]-goal_ompl[1]);
-            yaw_from_goal = fabs(angles::shortest_angular_distance(targetPose[2], goal_ompl[2]));
-            // if (xy_distance_from_goal <=g_tolerance && yaw_from_goal<=yaw_tolerance && isStartValid)
-            if (xy_distance_from_goal <=g_tolerance)
-            {
-                // std::cout << "Stop early" << std::endl;
-                isGoalValid=true;
-                break;
+                xy_distance_from_goal = std::hypot(targetPose[0]-goal_ompl[0], targetPose[1]-goal_ompl[1]);
+                yaw_from_goal = fabs(angles::shortest_angular_distance(targetPose[2], goal_ompl[2]));
+                // if (xy_distance_from_goal <=g_tolerance && yaw_from_goal<=yaw_tolerance && isStartValid)
+                if (xy_distance_from_goal <=g_tolerance)
+                {
+                    // std::cout << "Stop early" << std::endl;
+                    isGoalValid=true;
+                    break;
+                }
             }
+            if (isGoalValid)
+                break;
         }
-        
         if (isGoalValid)
         {
             FinalPathFromStart.interpolate();
@@ -340,7 +358,7 @@ namespace mpnet_local_planner{
         ss.setPlanner(planAlgo);
         // std::cout << "The range of the planner : " << planAlgo->getRange();
 
-        ob::PlannerStatus solved = ss.solve(0.05);
+        ob::PlannerStatus solved = ss.solve(0.03);
         traj.resetPoints();
 
         if (ss.haveSolutionPath())
@@ -489,11 +507,11 @@ int main(int argc,char* argv[]) {
         // Create a vector of inputs for current/goal states
         geometry_msgs::PoseWithCovarianceStamped targetPoint;
         base_local_planner::Trajectory path;
-        auto start_time = std::chrono::high_resolution_clock::now();
+        // auto start_time = std::chrono::high_resolution_clock::now();
         plan.getPath(global_pose, goal_point, spaceBound, path);
-        auto stop_time = std::chrono::high_resolution_clock::now();
-        auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-        ROS_INFO("Time taken to plan : %ld microseconds", duration.count());
+        // auto stop_time = std::chrono::high_resolution_clock::now();
+        // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+        // ROS_INFO("Time taken to plan : %ld microseconds", duration.count());
 
         // Publish the message
         gui_path.header.frame_id = "/map";
