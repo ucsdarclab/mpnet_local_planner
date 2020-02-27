@@ -50,6 +50,7 @@ namespace mpnet_local_planner{
 		void control_cmd_vel(geometry_msgs::Twist& cmd_vel);
 
 		bool verbose;
+		bool reached = true;
 		// vector<double> path_x = {};
 		// vector<double> path_y = {};
 		std::vector<double> path_x = vector<double>(N);

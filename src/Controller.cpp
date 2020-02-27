@@ -53,8 +53,16 @@ namespace mpnet_local_planner{
 			// 	curr = start;
 			// }
 			curr = start;
+		}
+		if(poses.size()>=1){
+			reached = false;
 			path_goal.at(0) = poses.back().pose.position.x;
 			path_goal.at(1) = poses.back().pose.position.y;
+		}
+		else{
+			reached = true;
+			path_goal.at(0) = x;
+			path_goal.at(1) = y;
 		}
 
 		
@@ -114,10 +122,11 @@ namespace mpnet_local_planner{
 			// }
 			ROS_INFO("x: [%f], y:[%f], th:[%f], goalx: [%f], goaly: [%f]", x, y, th, path_goal.at(0), path_goal.at(1));
 		}
-		if (pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2) < 0.1*0.1 || path_x.size()<1){
+		if (pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2) < 0.1*0.1 || path_x.size()<1 || reached == true){
 			// reached
 			// curr = 0;
 			// std::cout<<"reached"<<std::endl;
+			reached = true;
 			_ackermann_msg.drive.steering_angle = 0;
 			_ackermann_msg.drive.speed = 0;
 			_ackermann_msg.drive.acceleration = 0;//throttle_value;
