@@ -41,7 +41,7 @@ namespace mpnet_local_planner{
     bounds(NULL),
     si(NULL),
     initialized_(false),
-    g_tolerance(g_tolerance),
+    g_tolerance(xy_tolerance),
     yaw_tolerance(yaw_tolerance),
     planAlgo(NULL),
     device(torch::kCPU),
@@ -108,7 +108,6 @@ namespace mpnet_local_planner{
             planAlgo->setRange(0.2);
             planAlgo->setTreePruning(true);
 
-            // module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
             module = torch::jit::load(file_name);
             if (!torch::cuda::is_available())
             {
@@ -296,7 +295,7 @@ namespace mpnet_local_planner{
                 isGoalValid = pathToGoal.check();
                 if (isGoalValid)
                 {
-                    std::cout<< "Valid path found" << std::endl;
+                    ROS_INFO("Valid path found");
                     FinalPathFromStart.append(goal_ompl());
                     break;
                 }
@@ -316,10 +315,11 @@ namespace mpnet_local_planner{
 
                 xy_distance_from_goal = std::hypot(targetPose[0]-goal_ompl[0], targetPose[1]-goal_ompl[1]);
                 yaw_from_goal = fabs(angles::shortest_angular_distance(targetPose[2], goal_ompl[2]));
-                // if (xy_distance_from_goal <=g_tolerance && yaw_from_goal<=yaw_tolerance && isStartValid)
-                if (xy_distance_from_goal <=g_tolerance)
+                if (xy_distance_from_goal <=g_tolerance && yaw_from_goal<=yaw_tolerance && isStartValid)
+                // if (xy_distance_from_goal <=g_tolerance)
                 {
-                    // std::cout << "Stop early" << std::endl;
+                    ROS_INFO("Valid path close to goal found");
+                    ROS_INFO("The goal tolerance is set at : %f", g_tolerance);
                     isGoalValid=true;
                     break;
                 }
