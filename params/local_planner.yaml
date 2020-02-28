@@ -5,7 +5,7 @@ MpnetLocalPlanner:
   model_file: /root/data/mymap/trained_models/mpnet_model_299.pt
 
   # Goal Tolerance
-  xy_goal_tolerance: 0.1
+  xy_goal_tolerance: 0.2
   yaw_goal_tolerance: 0.1
 
   # Replanning parameters
