@@ -67,17 +67,17 @@ namespace mpnet_local_planner{
                 prune_plan_ = true;
                 global_frame_ = costmap_ros->getGlobalFrameID();
                 robot_base_frame_ = costmap_ros->getBaseFrameID();
-                private_nh.param<double>("xy_goal_tolerance", g_tolerance, 0.1);
-                private_nh.param<double>("yaw_goal_tolerance", yaw_tolerance, 0.2);
+                private_nh.param("xy_goal_tolerance", g_tolerance, 0.1);
+                private_nh.param("yaw_goal_tolerance", yaw_tolerance, 0.2);
                 xy_goal_tolerance = g_tolerance;
                 yaw_goal_tolerance = yaw_tolerance;
                 initialized_ = true;
-
+                ROS_INFO("Initialized xy tolerance: %f ", xy_goal_tolerance);
                 tc_ = new MpnetPlanner(
                     tf, 
                     navigation_costmap_ros_, 
                     file_name,
-                    xy_goal_tolerance,
+                    xy_goal_tolerance/2,
                     yaw_goal_tolerance
                     );
             }
@@ -173,10 +173,10 @@ namespace mpnet_local_planner{
                 double path_end_x, path_end_y, path_end_theta;
                 path.getEndpoint(path_end_x, path_end_y, path_end_theta);
                 double xy_local_thres = std::hypot(path_end_x-global_pose.pose.position.x, path_end_y -global_pose.pose.position.y);
-                if (xy_local_thres<1.0)
-                {
-                    valid_local_path = false;
-                }   
+                // if (xy_local_thres<1.0)
+                // {
+                valid_local_path = false;
+                // }   
             }
             if (!valid_local_path)
             {
@@ -195,25 +195,28 @@ namespace mpnet_local_planner{
                     path = new_path;
                     valid_local_path = true;
                 }
-                else
+                ROS_INFO("Number of points in local path: %ud", path.getPointsSize());
+                // if (path.getPointsSize()<1)
+                if (!local_plan.empty())
+                    pruneLocalPlan(global_pose, local_plan);
+                if (local_plan.size()==1)
                 {
-                    // tc_->getPathRRT_star(global_pose, goal_point, new_path);
-                    // if (new_path.getPointsSize()>1)
-                    // {
-                    //     ROS_INFO("Path from RRT star");
-                    //     path = new_path;
-                    //     valid_local_path = true;
-                    // }
-                    // else
-                    // {
-                        // ROS_INFO("Number of points in path : %ud",path.getPointsSize());
+                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                    // Check if we can connect the new_path and old_path
+                    if (new_path.getPointsSize()>1)
+                    {
+                        ROS_INFO("Path from RRT star");
+                        path = new_path;
+                        valid_local_path = true;
+                    }
+                    else
+                    {
                         // If no new path was found and the old path was empty then return false
-                        if (path.getPointsSize()==0)
                         {
                             ROS_INFO("Did not find a path in the initial search");
                             return false;        
                         }
-                    // }
+                    }
                 }
             }
         
@@ -263,5 +266,22 @@ namespace mpnet_local_planner{
             return false;
         }
         return reached_goal_;
+    }
+
+    void MpnetLocalPlanner::pruneLocalPlan(const geometry_msgs::PoseStamped& global_pose, std::vector<geometry_msgs::PoseStamped>& plan)
+    {
+        std::vector<geometry_msgs::PoseStamped>::iterator it = plan.begin();
+        while(it != plan.end()){
+            const geometry_msgs::PoseStamped& w = *it;
+            // Fixed error bound of 2 meters for now. Can reduce to a portion of the map size or based on the resolution
+            double x_diff = global_pose.pose.position.x - w.pose.position.x;
+            double y_diff = global_pose.pose.position.y - w.pose.position.y;
+            double distance_sq = x_diff * x_diff + y_diff * y_diff;
+            if(distance_sq < 0.01){
+                ROS_DEBUG("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
+                break;
+            }
+            it = plan.erase(it);
+        }
     }
 }

@@ -89,6 +89,12 @@ namespace mpnet_local_planner{
              */
             MpnetLocalPlanner(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros);
             
+            /**
+             * @brief A function to prune the local plan
+             * @param global_pose
+             * @param plan
+             */
+            void pruneLocalPlan(const geometry_msgs::PoseStamped& global_pose, std::vector<geometry_msgs::PoseStamped>& plan);
 
             /**
              * Destructor for the interface
