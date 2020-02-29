@@ -287,7 +287,7 @@ namespace mpnet_local_planner{
             double x_diff = global_pose.pose.position.x - w.pose.position.x;
             double y_diff = global_pose.pose.position.y - w.pose.position.y;
             double distance_sq = x_diff * x_diff + y_diff * y_diff;
-            if(distance_sq < 0.01){
+            if(distance_sq < 0.03){
                 ROS_DEBUG("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
                 break;
             }
