@@ -2,8 +2,11 @@
  * The core of the planner
  */
 
+#include <ros/ros.h>
+
 #include <torch/script.h>
 #include <torch/torch.h>
+
 #include <costmap_2d/costmap_2d.h>
 #include <costmap_2d/costmap_2d_ros.h>
 
@@ -20,7 +23,6 @@
 #include <ompl/geometric/SimpleSetup.h>
 #include <ompl/geometric/SimpleSetup.h>
 #include <ompl/geometric/planners/rrt/RRTstar.h>
-
 
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
@@ -119,6 +121,7 @@ namespace mpnet_local_planner{
         static char* cost_translation_table;
 
         tf2_ros::Buffer* tf_;
+        ros::Publisher target_robot_pub;
         costmap_2d::Costmap2DROS *navigation_costmap_ros, *collision_costmap_ros;
         costmap_2d::Costmap2D* costmap_, *costmap_collision_;
         base_local_planner::WorldModel* world_model;
