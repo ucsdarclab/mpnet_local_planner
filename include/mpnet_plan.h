@@ -134,5 +134,6 @@ namespace mpnet_local_planner{
         std::shared_ptr<ob::SpaceInformation> si;
         std::shared_ptr<og::RRTstar> planAlgo;
         double g_tolerance, yaw_tolerance; /** @brief The threshold for goal */
+        int num_samples, num_paths;
     };
 }
