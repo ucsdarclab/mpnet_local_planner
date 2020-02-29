@@ -42,7 +42,9 @@ namespace mpnet_local_planner{
             costmap_2d::Costmap2DROS *costmap_ros, 
             const std::string& file_name,
             double xy_tolerance,
-            double yaw_tolerance
+            double yaw_tolerance,
+            int numSamples,
+            int numPaths
             );
 
         ~MpnetPlanner();

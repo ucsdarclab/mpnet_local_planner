@@ -30,7 +30,9 @@ namespace mpnet_local_planner{
         costmap_2d::Costmap2DROS *costmap_ros, 
         const std::string& file_name,
         double xy_tolerance,
-        double yaw_tolerance):
+        double yaw_tolerance,
+        int numSamples,
+        int numPaths):
     tf_(NULL),
     navigation_costmap_ros(NULL),
     collision_costmap_ros(NULL),
@@ -45,7 +47,9 @@ namespace mpnet_local_planner{
     yaw_tolerance(yaw_tolerance),
     planAlgo(NULL),
     device(torch::kCPU),
-    use_gpu(true)
+    use_gpu(true),
+    num_samples(numSamples),
+    num_paths(numPaths)
     {
         if (~isInitialized())
         {
@@ -284,12 +288,12 @@ namespace mpnet_local_planner{
         traj.resetPoints();
         ob::ScopedState<> reset_ompl(space, start_ompl());
         double xy_distance_from_goal, yaw_from_goal;
-        for(int numPlan=0; numPlan<2; numPlan++)
+        for(int numPlan=0; numPlan<num_paths; numPlan++)
         {
             start_ompl=reset_ompl;
             FinalPathFromStart.clear();
             FinalPathFromStart.append(start_ompl());
-            for(int sample=0;sample<4;sample++)
+            for(int sample=0;sample<num_samples;sample++)
             {
                 og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
                 isGoalValid = pathToGoal.check();
@@ -406,7 +410,7 @@ int main(int argc,char* argv[]) {
     tf2_ros::Buffer buffer(ros::Duration(10.0));
     tf2_ros::TransformListener tf(buffer);
 
-    ros::NodeHandle n;
+    ros::NodeHandle n("/mpnet_local_planner/MpnetLocalPlanner");
     nav_msgs::OccupancyGrid grid;
 
     costmap_2d::Costmap2DROS *navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap",  buffer);

@@ -67,10 +67,18 @@ namespace mpnet_local_planner{
                 prune_plan_ = true;
                 global_frame_ = costmap_ros->getGlobalFrameID();
                 robot_base_frame_ = costmap_ros->getBaseFrameID();
+
+                // Goal tolerance parameter
                 private_nh.param("xy_goal_tolerance", g_tolerance, 0.1);
                 private_nh.param("yaw_goal_tolerance", yaw_tolerance, 0.2);
                 xy_goal_tolerance = g_tolerance;
                 yaw_goal_tolerance = yaw_tolerance;
+
+                // Planning parameters
+                int numSamples, numPaths;
+                private_nh.param("num_samples", numSamples, 4);
+                private_nh.param("num_paths", numPaths, 2);
+
                 initialized_ = true;
                 ROS_INFO("Initialized xy tolerance: %f ", xy_goal_tolerance);
                 tc_ = new MpnetPlanner(
@@ -78,7 +86,9 @@ namespace mpnet_local_planner{
                     navigation_costmap_ros_, 
                     file_name,
                     xy_goal_tolerance/2,
-                    yaw_goal_tolerance
+                    yaw_goal_tolerance,
+                    numSamples,
+                    numPaths
                     );
             }
             else
