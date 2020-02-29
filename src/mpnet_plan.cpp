@@ -129,7 +129,9 @@ namespace mpnet_local_planner{
                 ROS_INFO("Using GPU");
             }
             
-
+            // For debugging reasons
+            ros::NodeHandle n;
+            target_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/targetpose", 1);
             initialized_ = true;
 
         }
@@ -284,7 +286,10 @@ namespace mpnet_local_planner{
         ob::ScopedState<> target_pose(space), s(space);
         bool isStartValid, isGoalValid;
         std::vector<double> targetPose;
-        // base_local_planner::Trajectory traj(0.0,0.0,0.0,0.0, (unsigned int)10000);
+        // base_local_planner::Trajectory traj(0.0,0.0,0.0,0.0, (unsigned int)10000); 
+        geometry_msgs::PoseWithCovarianceStamped nextPose;
+        nextPose.header.frame_id = "/map";
+        ros::Rate rate(10.0);
         traj.resetPoints();
         ob::ScopedState<> reset_ompl(space, start_ompl());
         double xy_distance_from_goal, yaw_from_goal;
@@ -307,6 +312,17 @@ namespace mpnet_local_planner{
                 target_pose[0] = targetPose[0];
                 target_pose[1] = targetPose[1];
                 target_pose[2] = targetPose[2];
+
+                // // // Only for debugging purposes
+                // nextPose.pose.pose.position.x =  targetPose[0];
+                // nextPose.pose.pose.position.y = targetPose[1];
+                // nextPose.pose.pose.position.z = 0;
+
+                // nextPose.pose.pose.orientation.z = sin(targetPose[2]/2);
+                // nextPose.pose.pose.orientation.w = cos(targetPose[2]/2);
+                // target_robot_pub.publish(nextPose);
+                // ros::spinOnce();
+                // rate.sleep();
                 og::PathGeometric pathFromStart=og::PathGeometric(si, start_ompl(), target_pose());
                 isStartValid = pathFromStart.check();
                 
@@ -582,5 +598,11 @@ int main(int argc,char* argv[]) {
         rate.sleep();
         // if (navigation_costmap_ros!=NULL)
         //     delete navigation_costmap_ros;
+            }
     }
-}
+else
+{
+        ROS_ERROR("Did not find model file");
+                }
+
+    }
