@@ -416,8 +416,23 @@ int main(int argc,char* argv[]) {
     costmap_2d::Costmap2DROS *navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap",  buffer);
     navigation_costmap_ros->pause();
     costmap_2d::Costmap2D *costmap_ = navigation_costmap_ros->getCostmap();
-    std::string filename = "/root/data/mymap/mpnet_epoch_299.pt";
-    mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros, filename, 0.1, 0.2);
+
+    // Get file name
+    std::string filename;
+    if (n.getParam("model_file", filename))
+    {
+        // Goal tolerance parameter
+        double g_tolerance, yaw_tolerance;    
+        n.param("xy_goal_tolerance", g_tolerance, 0.1);
+        n.param("yaw_goal_tolerance", yaw_tolerance, 0.2);
+
+        // Planning parameters
+        int numSamples, numPaths;
+        n.param("num_samples", numSamples, 4);
+        n.param("num_paths", numPaths, 2);
+
+        mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros, filename, g_tolerance, yaw_tolerance, numSamples, numPaths);
+     
     navigation_costmap_ros->start();
     // -- FOR TESTING PURPOSES - setting start and goal location --
 
