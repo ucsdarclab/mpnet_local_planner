@@ -7,7 +7,8 @@
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_1f_full_tuned_edit.yaml"/>-->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_6f_icra2019_fx_net.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2.yaml"/> -->
-  <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_small.yaml"/>
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_small.yaml"/> -->
+    <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06_small.yaml"/>
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/unknown.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/> -->
@@ -48,7 +49,7 @@
 
   <node pkg="mpnet_plan" type="controller_node" respawn="true" name="controller_node" output="screen"/>
 
-  <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find mpnet_plan)/launch/mpnet_launch.rviz" /> -->
+  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find mpnet_plan)/launch/mpnet_launch.rviz" />
   <!-- <node type="rviz" name="rviz" pkg="rviz"/> -->
 
 

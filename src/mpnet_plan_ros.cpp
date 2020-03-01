@@ -185,7 +185,7 @@ namespace mpnet_local_planner{
         double global_yaw = tf2::getYaw(global_pose.pose.orientation);
         double yaw_from_goal = angles::shortest_angular_distance(global_yaw, angle);
         // if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
-        ROS_INFO("goal tolerance: %f", xy_goal_tolerance);
+        // ROS_INFO("goal tolerance: %f", xy_goal_tolerance);
         if (xydist_from_goal<=xy_goal_tolerance)
         {
             ROS_INFO("Reach Goal");
@@ -213,7 +213,7 @@ namespace mpnet_local_planner{
             tc_->getPath(global_pose, goal_point, spaceBound, new_path);
             auto stop_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-            ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+            // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
             // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
 
 
@@ -232,7 +232,6 @@ namespace mpnet_local_planner{
                     {
                         ROS_INFO("Path from RRT star");
                         path = new_path;
-                        
                         valid_local_path = true;
                     }
                     else
@@ -242,10 +241,10 @@ namespace mpnet_local_planner{
                     }
                 }
             }
-            ROS_INFO("Number of points in local path: %lud", local_plan.size());
+            // ROS_INFO("Number of points in local path: %lud", local_plan.size());
             if (!local_plan.empty())
                 pruneLocalPlan(global_pose, local_plan);
-            ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
+            // ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
             
             if (valid_local_path)
             {
