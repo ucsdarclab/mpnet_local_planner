@@ -31,7 +31,7 @@
 
   <!-- <include file="$(find amcl)/examples/amcl_diff.launch" /> -->
   
-  <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen">
+  <node pkg="move_base" type="move_base" respawn="true" name="move_base" output="screen">
   <!-- <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen" launch-prefix="xterm -e gdb "> -->
     <rosparam file="$(find racecar_simulator)/params/costmap_common_config.yaml" command="load" ns="global_costmap" /> 
     <rosparam file="$(find racecar_simulator)/params/costmap_common_config.yaml" command="load" ns="local_costmap" />
@@ -46,9 +46,9 @@
     <rosparam file="$(find mpnet_plan)/params/local_planner.yaml" command="load" />
   </node>
 
-  <node pkg="mpnet_plan" type="controller_node" respawn="false" name="controller_node" output="screen"/>
+  <node pkg="mpnet_plan" type="controller_node" respawn="true" name="controller_node" output="screen"/>
 
-  <node type="rviz" name="rviz" pkg="rviz" args="-d $(find mpnet_plan)/launch/mpnet_launch.rviz" />
+  <!-- <node type="rviz" name="rviz" pkg="rviz" args="-d $(find mpnet_plan)/launch/mpnet_launch.rviz" /> -->
   <!-- <node type="rviz" name="rviz" pkg="rviz"/> -->
 
 

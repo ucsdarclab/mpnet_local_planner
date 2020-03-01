@@ -18,8 +18,8 @@ class FG_eval {
     for (int t = 0; t < N; t++) {
       // fg[0] += 100.0*CppAD::pow(vars[cte_start + t], 2);
       // fg[0] += 100.0*CppAD::pow(vars[epsi_start + t], 2);
-      fg[0] += 500 *CppAD::pow(vars[x_start + t]-tgx[t], 2) * CppAD::pow(0.9, t);
-      fg[0] += 5000 *CppAD::pow(vars[y_start + t]-tgy[t], 2) * CppAD::pow(0.9, t);
+      fg[0] += 100 *CppAD::pow(vars[x_start + t]-tgx[t], 2) * CppAD::pow(0.8, t);
+      fg[0] += 500 *CppAD::pow(vars[y_start + t]-tgy[t], 2) * CppAD::pow(0.8, t);
       // fg[0] += 50 *CppAD::pow(vars[v_start + t]- ref_v, 2);
       // fg[0] += 10*(CppAD::pow(vars[x_start + t] - goal[0], 2)+CppAD::pow(vars[y_start + t] - goal[1], 2));
     }
@@ -33,7 +33,7 @@ class FG_eval {
     // }
 
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 50*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      fg[0] += 10*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
       // fg[0] += 0.1*CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
     // terminal loss
@@ -112,7 +112,7 @@ vector<double> MPC::Solve(std::vector<double> state, std::vector<double> ptsx, s
 
   for (i = v_start; i < delta_start; i++) {
     vars_lowerbound[i] =  0; 
-    vars_upperbound[i] =  0.2; 
+    vars_upperbound[i] =  0.3; 
   }
 
   for (i = delta_start; i < a_start; i++) {
@@ -160,7 +160,7 @@ vector<double> MPC::Solve(std::vector<double> state, std::vector<double> ptsx, s
   options += "Sparse  true        reverse\n";
   // NOTE: Currently the solver has a maximum time limit of 0.5 seconds.
   // Change this as you see fit.
-  options += "Numeric max_cpu_time          0.05\n";
+  options += "Numeric max_cpu_time          0.1\n";
 
   // place to return solution
   CppAD::ipopt::solve_result<Dvector> solution;
