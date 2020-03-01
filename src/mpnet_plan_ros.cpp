@@ -201,7 +201,7 @@ namespace mpnet_local_planner{
             valid_local_path = false;
             // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
             std::vector<double> spaceBound{6.0, 6.0, M_PI};
-         
+            
             if (!tc_->isStateValid(global_pose))
             {
                 ROS_INFO("Robot is in collision");
@@ -229,8 +229,11 @@ namespace mpnet_local_planner{
             }
             else
             {
-                if (local_plan.size()<=500)
+                xydist_from_goal = std::hypot(prev_goal.pose.position.x-global_pose.pose.position.x, prev_goal.pose.position.y-global_pose.pose.position.y);
+                // if (local_plan.size()<=50)
+                if (xydist_from_goal<=xy_goal_tolerance)
                 {
+                    new_path.resetPoints();
                     tc_->getPathRRT_star(global_pose, goal_point, new_path);
                     // Check if we can connect the new_path and old_path
                     if (new_path.getPointsSize()>1)
@@ -265,6 +268,7 @@ namespace mpnet_local_planner{
                     tf2::convert(q, pose.pose.orientation);
                     local_plan.push_back(pose);
                 }
+                prev_goal = local_plan.back();
             }
 
         }
@@ -297,7 +301,7 @@ namespace mpnet_local_planner{
             double x_diff = global_pose.pose.position.x - w.pose.position.x;
             double y_diff = global_pose.pose.position.y - w.pose.position.y;
             double distance_sq = x_diff * x_diff + y_diff * y_diff;
-            if(distance_sq < 0.25){
+            if(distance_sq < 0.01){
                 ROS_DEBUG("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
                 break;
             }
