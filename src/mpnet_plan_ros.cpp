@@ -185,7 +185,7 @@ namespace mpnet_local_planner{
         double global_yaw = tf2::getYaw(global_pose.pose.orientation);
         double yaw_from_goal = angles::shortest_angular_distance(global_yaw, angle);
         // if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
-        ROS_INFO("goal tolerance: %f", xy_goal_tolerance);
+        // ROS_INFO("goal tolerance: %f", xy_goal_tolerance);
         if (xydist_from_goal<=xy_goal_tolerance)
         {
             ROS_INFO("Reach Goal");
@@ -201,8 +201,7 @@ namespace mpnet_local_planner{
             valid_local_path = false;
             // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
             std::vector<double> spaceBound{6.0, 6.0, M_PI};
-            base_local_planner::Trajectory new_path;
-            auto start_time = std::chrono::high_resolution_clock::now();
+            
             if (!tc_->isStateValid(global_pose))
             {
                 ROS_INFO("Robot is in collision");
@@ -210,11 +209,17 @@ namespace mpnet_local_planner{
                 local_plan.clear();
                 return false;
             }
+            base_local_planner::Trajectory new_path;
+            auto start_time = std::chrono::high_resolution_clock::now();
             tc_->getPath(global_pose, goal_point, spaceBound, new_path);
             auto stop_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-            ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+            // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
             // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
+            ROS_INFO("Number of points in local path: %lud", local_plan.size());
+            if (!local_plan.empty())
+                pruneLocalPlan(global_pose, local_plan);
+            ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
 
 
             if (new_path.getPointsSize()>1) 
@@ -224,15 +229,17 @@ namespace mpnet_local_planner{
             }
             else
             {
-                if (local_plan.size()<=1)
+                xydist_from_goal = std::hypot(prev_goal.pose.position.x-global_pose.pose.position.x, prev_goal.pose.position.y-global_pose.pose.position.y);
+                // if (local_plan.size()<=50)
+                if (xydist_from_goal<=xy_goal_tolerance)
                 {
-                    // tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                    new_path.resetPoints();
+                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
                     // Check if we can connect the new_path and old_path
                     if (new_path.getPointsSize()>1)
                     {
                         ROS_INFO("Path from RRT star");
                         path = new_path;
-                        
                         valid_local_path = true;
                     }
                     else
@@ -242,10 +249,6 @@ namespace mpnet_local_planner{
                     }
                 }
             }
-            ROS_INFO("Number of points in local path: %lud", local_plan.size());
-            if (!local_plan.empty())
-                pruneLocalPlan(global_pose, local_plan);
-            ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
             
             if (valid_local_path)
             {
@@ -265,6 +268,7 @@ namespace mpnet_local_planner{
                     tf2::convert(q, pose.pose.orientation);
                     local_plan.push_back(pose);
                 }
+                prev_goal = local_plan.back();
             }
 
         }
@@ -297,7 +301,7 @@ namespace mpnet_local_planner{
             double x_diff = global_pose.pose.position.x - w.pose.position.x;
             double y_diff = global_pose.pose.position.y - w.pose.position.y;
             double distance_sq = x_diff * x_diff + y_diff * y_diff;
-            if(distance_sq < 0.25){
+            if(distance_sq < 0.01){
                 ROS_DEBUG("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
                 break;
             }

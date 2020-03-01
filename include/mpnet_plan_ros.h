@@ -126,6 +126,7 @@ namespace mpnet_local_planner{
             base_local_planner::Trajectory path;
             std::vector<geometry_msgs::PoseStamped> global_plan_;
             std::vector<geometry_msgs::PoseStamped> local_plan;
+            geometry_msgs::PoseStamped prev_goal;
 
             std::vector<geometry_msgs::Point> robot_footprint;
             Controller controller;
