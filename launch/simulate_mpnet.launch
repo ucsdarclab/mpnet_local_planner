@@ -34,7 +34,6 @@
   <!-- <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen" launch-prefix="xterm -e gdb "> -->
     <rosparam file="$(find racecar_simulator)/params/costmap_common_config.yaml" command="load" ns="global_costmap" /> 
     <rosparam file="$(find racecar_simulator)/params/costmap_common_config.yaml" command="load" ns="local_costmap" />
-    <rosparam file="$(find rrt_global_planner)/params/costmap_common_config.yaml" command="load" ns="collision_costmap" />
     <rosparam file="$(find racecar_simulator)/params/local_costmap_param.yaml" command="load" />
     <rosparam file="$(find racecar_simulator)/params/global_costmap_param.yaml" command="load" /> 
     <rosparam file="$(find mpnet_plan)/params/collision_costmap_param.yaml" command="load" /> 
