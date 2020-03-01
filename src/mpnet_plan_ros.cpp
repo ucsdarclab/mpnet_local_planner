@@ -81,9 +81,12 @@ namespace mpnet_local_planner{
                 yaw_goal_tolerance = yaw_tolerance;
 
                 // Planning parameters
-                int numSamples, numPaths;
+                int numSamples, numPaths, replanning_freq;
+                private_nh.param("replanning_freq", replanning_freq, 0);
                 private_nh.param("num_samples", numSamples, 4);
                 private_nh.param("num_paths", numPaths, 2);
+                plan_freq = replanning_freq;
+                plan_freq_count= 0;
 
                 // LoadRobotActualFootprints
                 robot_footprint = costmap_2d::makeFootprintFromParams(private_nh);
@@ -127,7 +130,7 @@ namespace mpnet_local_planner{
         else
             ROS_INFO("Was not able to reset the controller");
         global_plan_ = orig_global_plan;
-
+        plan_freq_count = 0;
         reached_goal_ = false;
         valid_local_path = false;
         return true;
@@ -194,62 +197,66 @@ namespace mpnet_local_planner{
             cmd_vel.angular.z = 0.0;
             reached_goal_ = true;
             valid_local_path = false;
+            plan_freq_count = 0;
             return true;
         }
-        else
+        else if (plan_freq_count%plan_freq ==0)
         {
-            valid_local_path = false;
-            // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
-            std::vector<double> spaceBound{6.0, 6.0, M_PI};
-            
-            if (!tc_->isStateValid(global_pose))
+            plan_freq_count = 0;
             {
-                ROS_INFO("Robot is in collision");
-                path.resetPoints();
-                local_plan.clear();
-                return false;
-            }
-            base_local_planner::Trajectory new_path;
-            auto start_time = std::chrono::high_resolution_clock::now();
-            tc_->getPath(global_pose, goal_point, spaceBound, new_path);
-            auto stop_time = std::chrono::high_resolution_clock::now();
-            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-            // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
-            // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
-            ROS_INFO("Number of points in local path: %lud", local_plan.size());
-            if (!local_plan.empty())
-                pruneLocalPlan(global_pose, local_plan);
-            ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
-
-
-            if (new_path.getPointsSize()>1) 
-            {
-                path = new_path;
-                valid_local_path = true;
-            }
-            else
-            {
-                xydist_from_goal = std::hypot(prev_goal.pose.position.x-global_pose.pose.position.x, prev_goal.pose.position.y-global_pose.pose.position.y);
-                // if (local_plan.size()<=50)
-                if (xydist_from_goal<=xy_goal_tolerance || local_plan.size()==0)
+                valid_local_path = false;
+                // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
+                std::vector<double> spaceBound{6.0, 6.0, M_PI};
+                
+                if (!tc_->isStateValid(global_pose))
                 {
-                    new_path.resetPoints();
-                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
-                    // Check if we can connect the new_path and old_path
-                    if (new_path.getPointsSize()>1)
+                    ROS_INFO("Robot is in collision");
+                    path.resetPoints();
+                    local_plan.clear();
+                    return false;
+                }
+                base_local_planner::Trajectory new_path;
+                auto start_time = std::chrono::high_resolution_clock::now();
+                tc_->getPath(global_pose, goal_point, spaceBound, new_path);
+                auto stop_time = std::chrono::high_resolution_clock::now();
+                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+                // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+                // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
+                ROS_INFO("Number of points in local path: %lud", local_plan.size());
+                if (!local_plan.empty())
+                    pruneLocalPlan(global_pose, local_plan);
+                ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
+
+
+                if (new_path.getPointsSize()>1) 
+                {
+                    path = new_path;
+                    valid_local_path = true;
+                }
+                else
+                {
+                    xydist_from_goal = std::hypot(prev_goal.pose.position.x-global_pose.pose.position.x, prev_goal.pose.position.y-global_pose.pose.position.y);
+                    // if (local_plan.size()<=50)
+                    if (xydist_from_goal<=xy_goal_tolerance || local_plan.size()==0)
                     {
-                        ROS_INFO("Path from RRT star");
-                        path = new_path;
-                        valid_local_path = true;
+                        new_path.resetPoints();
+                        tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                        // Check if we can connect the new_path and old_path
+                        if (new_path.getPointsSize()>1)
+                        {
+                            ROS_INFO("Path from RRT star");
+                            path = new_path;
+                            valid_local_path = true;
+                        }
+                        else
+                        {
+                            ROS_INFO("Did not find a path in the initial search");
+                            return false;        
+                        }
                     }
-                    else
-                    {
-                        ROS_INFO("Did not find a path in the initial search");
-                        return false;        
-                    }
+                
                 }
             }
-            
             if (valid_local_path)
             {
                 local_plan.clear();
@@ -272,6 +279,8 @@ namespace mpnet_local_planner{
             }
 
         }
+        plan_freq_count++;
+
         // Publish information to the visualizer
         base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
         base_local_planner::publishPlan(local_plan, l_plan_pub_);
