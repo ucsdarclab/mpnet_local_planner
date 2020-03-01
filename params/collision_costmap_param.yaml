@@ -3,7 +3,8 @@ collision_costmap:
   robot_base_frame: base_link
   obstacle_range:  2.5
   raytrace_range:  3.0
-  footprint: [[0.4564,0.172],[-0.2024,0.172],[-0.2024,-0.172],[0.4564,-0.172]]
+  # footprint: [[0.4564,0.172],[-0.2024,0.172],[-0.2024,-0.172],[0.4564,-0.172]]
+  footprint: [[0.4064,0.122],[-0.1524,0.122],[-0.1524,-0.122],[0.4064,-0.122]]
 
   observation_sources:  laser_scan_sensor 
 
