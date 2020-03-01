@@ -9,7 +9,7 @@ MpnetLocalPlanner:
 
   # Number of Plans
   num_samples: 4
-  num_paths: 2
+  num_paths: 10
 
   # Goal Tolerance
   xy_goal_tolerance: 0.2

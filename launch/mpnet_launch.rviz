@@ -156,11 +156,11 @@ Visualization Manager:
     - Alpha: 1
       Class: rviz/Polygon
       Color: 170; 0; 0
-      Enabled: true
+      Enabled: false
       Name: Polygon
       Topic: /move_base/local_costmap/footprint
       Unreliable: false
-      Value: true
+      Value: false
     - Alpha: 1
       Axes Length: 1
       Axes Radius: 0.10000000149011612
@@ -219,7 +219,7 @@ Visualization Manager:
       Color: 25; 255; 0
       Enabled: true
       Name: Polygon
-      Topic: /move_base/collision_costmap/footprint
+      Topic: /move_base/MpnetLocalPlanner/robot_footprint
       Unreliable: false
       Value: true
   Enabled: true
@@ -262,8 +262,8 @@ Visualization Manager:
       Scale: 108.82431030273438
       Target Frame: <Fixed Frame>
       Value: TopDownOrtho (rviz)
-      X: 2.858614444732666
-      Y: 3.5600385665893555
+      X: 2.5645623207092285
+      Y: 4.4973297119140625
     Saved: ~
 Window Geometry:
   Displays:

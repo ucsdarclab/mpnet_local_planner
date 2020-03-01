@@ -44,7 +44,7 @@ namespace mpnet_local_planner{
 		std::vector<geometry_msgs::PoseStamped> poses = msg->poses;
 		// std::cout<<poses.size()<<std::endl;
 		// int k = 2;
-		int k = 2;
+		int k = 4;
 		int length = poses.size()>(std::size_t)(N*k) ? N: poses.size(), start = 0;
 		
 		double min = 1e10;

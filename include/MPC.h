@@ -21,7 +21,7 @@ class MPC {
 
 // Set the timestep length and duration
 // const int N = 20;
-const double dt = 0.08;
+const double dt = 0.05;
 
 // This value assumes the model presented in the classroom is used.
 //
