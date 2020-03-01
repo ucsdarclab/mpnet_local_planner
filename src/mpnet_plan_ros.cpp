@@ -190,11 +190,19 @@ namespace mpnet_local_planner{
             std::vector<double> spaceBound{6.0, 6.0, M_PI};
             base_local_planner::Trajectory new_path;
             auto start_time = std::chrono::high_resolution_clock::now();
+            if (!tc_->isStateValid(global_pose))
+            {
+                ROS_INFO("Robot is in collision");
+                path.resetPoints();
+                local_plan.clear();
+                return false;
+            }
             tc_->getPath(global_pose, goal_point, spaceBound, new_path);
             auto stop_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
             ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
             // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
+
 
             if (new_path.getPointsSize()>1) 
             {

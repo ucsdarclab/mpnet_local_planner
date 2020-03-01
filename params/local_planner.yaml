@@ -2,7 +2,8 @@ clearing_rotation_allowed: false
 
 MpnetLocalPlanner:
   # Model file location
-  model_file: /root/data/mymap/trained_models/mpnet_model_299.pt
+  model_file: /root/data/grid_map_2/trained_models/mpnet_model_299.pt
+  # model_file: /root/data/mymap/trained_models/mpnet_model_299.pt
   # model_file: /root/data/grid_world_2_0_06/trained_models/mpnet_model_299.pt
 
 
@@ -16,4 +17,3 @@ MpnetLocalPlanner:
 
   # Replanning parameters
   xy_replan_tolerance: 1.0
-  
