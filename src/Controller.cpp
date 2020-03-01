@@ -11,6 +11,19 @@ namespace mpnet_local_planner{
 
 	Controller::~Controller(){}
 
+	bool Controller::resetController(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response)
+	{
+		path_x = vector<double>(N);
+		path_y = vector<double>(N);
+		path_goal = vector<double>(2);
+
+		reached = true;
+		// path_goal.at(0) = x;
+		// path_goal.at(1) = y;
+
+		return true;
+	}
+
 	void Controller::observe(geometry_msgs::PoseStamped& robot_vel, nav_msgs::Odometry& base_odom)
 	{	
 		
@@ -31,7 +44,7 @@ namespace mpnet_local_planner{
 		std::vector<geometry_msgs::PoseStamped> poses = msg->poses;
 		// std::cout<<poses.size()<<std::endl;
 		// int k = 2;
-		int k = 4;
+		int k = 6;
 		int length = poses.size()>(std::size_t)(N*k) ? N: poses.size(), start = 0;
 		
 		double min = 1e10;
@@ -122,7 +135,8 @@ namespace mpnet_local_planner{
 			// }
 			ROS_INFO("x: [%f], y:[%f], th:[%f], goalx: [%f], goaly: [%f]", x, y, th, path_goal.at(0), path_goal.at(1));
 		}
-		if (pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2) < 0.2*0.2 || path_x.size()<1 || reached == true){
+		double dist = pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2); 
+		if ( dist< 0.2*0.2 || path_x.size()<1 || reached == true){
 			// reached
 			// curr = 0;
 			// std::cout<<"reached"<<std::endl;

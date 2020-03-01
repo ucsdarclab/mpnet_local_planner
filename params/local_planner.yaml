@@ -12,7 +12,7 @@ MpnetLocalPlanner:
   num_paths: 2
 
   # Goal Tolerance
-  xy_goal_tolerance: 0.2
+  xy_goal_tolerance: 0.3
   yaw_goal_tolerance: 0.1
 
   # Replanning parameters

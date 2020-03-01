@@ -15,6 +15,9 @@
 #include <odometry_helper_ros.h>
 #include <tf2/utils.h>
 
+#include <std_srvs/Empty.h>
+
+
 // for MPC
 #include "MPC.h"
 #include <cppad/cppad.hpp>
@@ -56,6 +59,11 @@ namespace mpnet_local_planner{
 		std::vector<double> path_x = vector<double>(N);
 		std::vector<double> path_y = vector<double>(N);
 		std::vector<double> path_goal = vector<double>(2);
+
+		/**
+		 * @brief Reset the controller parameters
+		 */
+		bool resetController(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 		
 		/** 
 		 * @brief: The default constructor
@@ -78,9 +86,9 @@ namespace mpnet_local_planner{
 		
 		MPC mpc;
 		double x, y, th, vel, vth, a = 0, sta=0;
-		int curr = 0;	
+		int curr = 0;
 		// Eigen::VectorXd coeffs;
-
+		bool set_goal;
 
 	};
 }
