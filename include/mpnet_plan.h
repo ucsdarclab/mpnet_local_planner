@@ -46,7 +46,8 @@ namespace mpnet_local_planner{
             double xy_tolerance,
             double yaw_tolerance,
             int numSamples,
-            int numPaths
+            int numPaths,
+            std::vector<geometry_msgs::Point> footprint
             );
 
         ~MpnetPlanner();
@@ -141,5 +142,6 @@ namespace mpnet_local_planner{
         std::shared_ptr<og::RRTstar> planAlgo;
         double g_tolerance, yaw_tolerance; /** @brief The threshold for goal */
         int num_samples, num_paths;
+        std::vector<geometry_msgs::Point> robot_footprint;
     };
 }

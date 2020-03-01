@@ -15,6 +15,8 @@
 
 #include <pluginlib/class_list_macros.h>
 
+#include <costmap_2d/footprint.h>
+
 // Register this planner
 PLUGINLIB_EXPORT_CLASS(mpnet_local_planner::MpnetLocalPlanner, nav_core::BaseLocalPlanner)
 
@@ -82,6 +84,9 @@ namespace mpnet_local_planner{
                 private_nh.param("num_samples", numSamples, 4);
                 private_nh.param("num_paths", numPaths, 2);
 
+                // LoadRobotActualFootprints
+                robot_footprint = costmap_2d::makeFootprintFromParams(private_nh);
+
                 initialized_ = true;
                 ROS_INFO("Initialized xy tolerance: %f ", xy_goal_tolerance);
                 tc_ = new MpnetPlanner(
@@ -91,7 +96,8 @@ namespace mpnet_local_planner{
                     xy_goal_tolerance/2,
                     yaw_goal_tolerance,
                     numSamples,
-                    numPaths
+                    numPaths,
+                    robot_footprint
                     );
             }
             else

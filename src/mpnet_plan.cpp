@@ -32,7 +32,8 @@ namespace mpnet_local_planner{
         double xy_tolerance,
         double yaw_tolerance,
         int numSamples,
-        int numPaths):
+        int numPaths,
+        std::vector<geometry_msgs::Point> footprint):
     tf_(NULL),
     navigation_costmap_ros(NULL),
     collision_costmap_ros(NULL),
@@ -49,7 +50,8 @@ namespace mpnet_local_planner{
     device(torch::kCPU),
     use_gpu(true),
     num_samples(numSamples),
-    num_paths(numPaths)
+    num_paths(numPaths),
+    robot_footprint(footprint)
     {
         if (~isInitialized())
         {
@@ -265,9 +267,11 @@ namespace mpnet_local_planner{
 
     bool MpnetPlanner::isStateValid(geometry_msgs::PoseStamped start)
     {
-        std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
         double yaw = tf2::getYaw(start.pose.orientation);
-        double footprint_cost = world_model->footprintCost(start.pose.position.x, start.pose.position.y, yaw, footprint);
+        std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
+        std::cout << footprint << std::endl;
+        std::cout << robot_footprint <<std::endl;
+        double footprint_cost = world_model->footprintCost(start.pose.position.x, start.pose.position.y, yaw, robot_footprint);
         return (footprint_cost>=0);
     }
 
@@ -454,8 +458,8 @@ int main(int argc,char* argv[]) {
         int numSamples, numPaths;
         n.param("num_samples", numSamples, 4);
         n.param("num_paths", numPaths, 2);
-
-        mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros, filename, g_tolerance, yaw_tolerance, numSamples, numPaths);
+        std::vector<geometry_msgs::Point> footprint;
+        mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros, filename, g_tolerance, yaw_tolerance, numSamples, numPaths, footprint);
      
     navigation_costmap_ros->start();
     // -- FOR TESTING PURPOSES - setting start and goal location --

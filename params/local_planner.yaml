@@ -17,3 +17,6 @@ MpnetLocalPlanner:
 
   # Replanning parameters
   xy_replan_tolerance: 1.0
+
+  # Actual footprint of the robot
+  footprint: [[0.4064,0.122],[-0.1524,0.122],[-0.1524,-0.122],[0.4064,-0.122]]

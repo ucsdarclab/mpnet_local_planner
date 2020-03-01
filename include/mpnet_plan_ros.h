@@ -122,7 +122,7 @@ namespace mpnet_local_planner{
             std::vector<geometry_msgs::PoseStamped> global_plan_;
             std::vector<geometry_msgs::PoseStamped> local_plan;
 
-
+            std::vector<geometry_msgs::Point> robot_footprint;
             Controller controller;
             OdometryHelperRos odom_helper_;
     };
