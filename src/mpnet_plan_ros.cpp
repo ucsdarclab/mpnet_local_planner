@@ -201,8 +201,7 @@ namespace mpnet_local_planner{
             valid_local_path = false;
             // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
             std::vector<double> spaceBound{6.0, 6.0, M_PI};
-            base_local_planner::Trajectory new_path;
-            auto start_time = std::chrono::high_resolution_clock::now();
+         
             if (!tc_->isStateValid(global_pose))
             {
                 ROS_INFO("Robot is in collision");
@@ -210,11 +209,17 @@ namespace mpnet_local_planner{
                 local_plan.clear();
                 return false;
             }
+            base_local_planner::Trajectory new_path;
+            auto start_time = std::chrono::high_resolution_clock::now();
             tc_->getPath(global_pose, goal_point, spaceBound, new_path);
             auto stop_time = std::chrono::high_resolution_clock::now();
             auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
             // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
             // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
+            ROS_INFO("Number of points in local path: %lud", local_plan.size());
+            if (!local_plan.empty())
+                pruneLocalPlan(global_pose, local_plan);
+            ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
 
 
             if (new_path.getPointsSize()>1) 
@@ -224,9 +229,9 @@ namespace mpnet_local_planner{
             }
             else
             {
-                if (local_plan.size()<=1)
+                if (local_plan.size()<=500)
                 {
-                    // tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
                     // Check if we can connect the new_path and old_path
                     if (new_path.getPointsSize()>1)
                     {
@@ -241,10 +246,6 @@ namespace mpnet_local_planner{
                     }
                 }
             }
-            // ROS_INFO("Number of points in local path: %lud", local_plan.size());
-            if (!local_plan.empty())
-                pruneLocalPlan(global_pose, local_plan);
-            // ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
             
             if (valid_local_path)
             {
