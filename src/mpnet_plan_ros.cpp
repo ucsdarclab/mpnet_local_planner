@@ -231,7 +231,7 @@ namespace mpnet_local_planner{
             {
                 xydist_from_goal = std::hypot(prev_goal.pose.position.x-global_pose.pose.position.x, prev_goal.pose.position.y-global_pose.pose.position.y);
                 // if (local_plan.size()<=50)
-                if (xydist_from_goal<=xy_goal_tolerance)
+                if (xydist_from_goal<=xy_goal_tolerance || local_plan.size()==0)
                 {
                     new_path.resetPoints();
                     tc_->getPathRRT_star(global_pose, goal_point, new_path);
