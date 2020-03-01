@@ -109,6 +109,7 @@ namespace mpnet_local_planner{
         }
 
         global_plan_.clear();
+        local_plan.clear();
         path.resetPoints();
         global_plan_ = orig_global_plan;
 
@@ -124,8 +125,6 @@ namespace mpnet_local_planner{
             ROS_ERROR("This planner has not been initialized, please call initialize() before using this planner");
             return false;
         }
-
-        std::vector<geometry_msgs::PoseStamped> local_plan;
         geometry_msgs::PoseStamped global_pose;
         if (!navigation_costmap_ros_->getRobotPose(global_pose)){
             return false;
@@ -177,85 +176,66 @@ namespace mpnet_local_planner{
         }
         else
         {
-            // TODO: Check if the global_pose is near the end of the path
-            if (valid_local_path)
-            {
-                double path_end_x, path_end_y, path_end_theta;
-                path.getEndpoint(path_end_x, path_end_y, path_end_theta);
-                double xy_local_thres = std::hypot(path_end_x-global_pose.pose.position.x, path_end_y -global_pose.pose.position.y);
-                // if (xy_local_thres<1.0)
-                // {
-                valid_local_path = false;
-                // }   
-            }
-            if (!valid_local_path)
-            {
-                // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
-                std::vector<double> spaceBound{6.0, 6.0, M_PI};
-                base_local_planner::Trajectory new_path;
-                auto start_time = std::chrono::high_resolution_clock::now();
-                tc_->getPath(global_pose, goal_point, spaceBound, new_path);
-                auto stop_time = std::chrono::high_resolution_clock::now();
-                auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-                ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
-                // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
+            valid_local_path = false;
+            // TODO: Define the bound for space - THIS IS A HACK, need to add this as a class variable
+            std::vector<double> spaceBound{6.0, 6.0, M_PI};
+            base_local_planner::Trajectory new_path;
+            auto start_time = std::chrono::high_resolution_clock::now();
+            tc_->getPath(global_pose, goal_point, spaceBound, new_path);
+            auto stop_time = std::chrono::high_resolution_clock::now();
+            auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+            ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+            // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
 
-                if (new_path.getPointsSize()>1) 
+            if (new_path.getPointsSize()>1) 
+            {
+                path = new_path;
+                valid_local_path = true;
+            }
+            else
+            {
+                if (local_plan.size()<=1)
                 {
-                    path = new_path;
-                    valid_local_path = true;
-                }
-                ROS_INFO("Number of points in local path: %ud", path.getPointsSize());
-                // if (path.getPointsSize()<1)
-                if (!local_plan.empty())
-                    pruneLocalPlan(global_pose, local_plan);
-                if (local_plan.size()==1)
-                {
-                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                    // tc_->getPathRRT_star(global_pose, goal_point, new_path);
                     // Check if we can connect the new_path and old_path
                     if (new_path.getPointsSize()>1)
                     {
                         ROS_INFO("Path from RRT star");
                         path = new_path;
+                        
                         valid_local_path = true;
                     }
                     else
                     {
-                        // If no new path was found and the old path was empty then return false
-                        {
-                            ROS_INFO("Did not find a path in the initial search");
-                            return false;        
-                        }
+                        ROS_INFO("Did not find a path in the initial search");
+                        return false;        
                     }
                 }
             }
-        
-            for (unsigned int i=0; i < path.getPointsSize(); i++)
+            ROS_INFO("Number of points in local path: %lud", local_plan.size());
+            if (!local_plan.empty())
+                pruneLocalPlan(global_pose, local_plan);
+            ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
+            
+            if (valid_local_path)
             {
-                double p_x, p_y, p_th;
-                path.getPoint(i, p_x, p_y, p_th);
-                geometry_msgs::PoseStamped pose;
-                pose.header.frame_id = global_frame_;
-                pose.header.stamp = ros::Time::now();
-                pose.pose.position.x = p_x;
-                pose.pose.position.y = p_y;
-                pose.pose.position.z = 0.0;
-                tf2::Quaternion q;
-                q.setRPY(0, 0, p_th);
-                tf2::convert(q, pose.pose.orientation);
-                local_plan.push_back(pose);
+                local_plan.clear();
+                for (unsigned int i=0; i < path.getPointsSize(); i++)
+                {
+                    double p_x, p_y, p_th;
+                    path.getPoint(i, p_x, p_y, p_th);
+                    geometry_msgs::PoseStamped pose;
+                    pose.header.frame_id = global_frame_;
+                    pose.header.stamp = ros::Time::now();
+                    pose.pose.position.x = p_x;
+                    pose.pose.position.y = p_y;
+                    pose.pose.position.z = 0.0;
+                    tf2::Quaternion q;
+                    q.setRPY(0, 0, p_th);
+                    tf2::convert(q, pose.pose.orientation);
+                    local_plan.push_back(pose);
+                }
             }
-            // geometry_msgs::PoseStamped robot_vel;
-            // odom_helper_.getRobotVel(robot_vel);
-            // nav_msgs::Odometry base_odom;
-            // odom_helper_.getOdom(base_odom);
-            // auto start = std::chrono::high_resolution_clock::now();
-            // controller.observe(robot_vel, base_odom);
-            // controller.get_path(path);
-            // controller.control_cmd_vel(cmd_vel);
-            // auto stop = std::chrono::high_resolution_clock::now();
-            // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop-start);
-            // ROS_INFO("Took %ld microseconds to generate trajectories",duration.count());
 
         }
         // Publish information to the visualizer
@@ -287,7 +267,7 @@ namespace mpnet_local_planner{
             double x_diff = global_pose.pose.position.x - w.pose.position.x;
             double y_diff = global_pose.pose.position.y - w.pose.position.y;
             double distance_sq = x_diff * x_diff + y_diff * y_diff;
-            if(distance_sq < 0.03){
+            if(distance_sq < 0.25){
                 ROS_DEBUG("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
                 break;
             }

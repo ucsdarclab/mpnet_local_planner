@@ -120,6 +120,7 @@ namespace mpnet_local_planner{
             bool valid_local_path;
             base_local_planner::Trajectory path;
             std::vector<geometry_msgs::PoseStamped> global_plan_;
+            std::vector<geometry_msgs::PoseStamped> local_plan;
 
 
             Controller controller;
