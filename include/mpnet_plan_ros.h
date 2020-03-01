@@ -107,6 +107,7 @@ namespace mpnet_local_planner{
 
             MpnetLocalPlanner();
 
+            
         private:
             tf2_ros::Buffer* tf_;
             costmap_2d::Costmap2DROS* navigation_costmap_ros_;
@@ -131,5 +132,6 @@ namespace mpnet_local_planner{
             std::vector<geometry_msgs::Point> robot_footprint;
             Controller controller;
             OdometryHelperRos odom_helper_;
+            int plan_freq, plan_freq_count;
     };
 }
