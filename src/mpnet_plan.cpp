@@ -19,6 +19,7 @@
 
 #include <angles/angles.h>
 
+
 namespace mpnet_local_planner{
     
     char* MpnetPlanner::cost_translation_table=NULL;
@@ -268,9 +269,6 @@ namespace mpnet_local_planner{
     bool MpnetPlanner::isStateValid(geometry_msgs::PoseStamped start)
     {
         double yaw = tf2::getYaw(start.pose.orientation);
-        std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
-        std::cout << footprint << std::endl;
-        std::cout << robot_footprint <<std::endl;
         double footprint_cost = world_model->footprintCost(start.pose.position.x, start.pose.position.y, yaw, robot_footprint);
         return (footprint_cost>=0);
     }

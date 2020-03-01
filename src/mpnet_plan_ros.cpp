@@ -58,6 +58,7 @@ namespace mpnet_local_planner{
             ros::NodeHandle private_nh("~/"+name);  
             l_plan_pub_ = private_nh.advertise<nav_msgs::Path>("local_plan", 1);
             g_plan_pub_ = private_nh.advertise<nav_msgs::Path>("global_plan", 1);
+            footprintPolygon = private_nh.advertise<geometry_msgs::PolygonStamped>("robot_footprint",1);
             resetController = private_nh.serviceClient<std_srvs::Empty>("/reset_controller");
 
             navigation_costmap_ros_ = costmap_ros;
@@ -143,6 +144,12 @@ namespace mpnet_local_planner{
         if (!navigation_costmap_ros_->getRobotPose(global_pose)){
             return false;
         }
+
+        geometry_msgs::PolygonStamped oriented_footprint;
+        oriented_footprint.header.frame_id = global_frame_;
+        double yaw = tf2::getYaw(global_pose.pose.orientation);
+        costmap_2d::transformFootprint(global_pose.pose.position.x, global_pose.pose.position.y, yaw, robot_footprint, oriented_footprint);
+        footprintPolygon.publish(oriented_footprint);
 
         std::vector<geometry_msgs::PoseStamped> transformed_plan;
         if (!base_local_planner::transformGlobalPlan(*tf_, global_plan_, global_pose, *costmap_, global_frame_, transformed_plan))
