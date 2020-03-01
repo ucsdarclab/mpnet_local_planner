@@ -263,6 +263,14 @@ namespace mpnet_local_planner{
         return (footprint_cost>=0);
     }
 
+    bool MpnetPlanner::isStateValid(geometry_msgs::PoseStamped start)
+    {
+        std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
+        double yaw = tf2::getYaw(start.pose.orientation);
+        double footprint_cost = world_model->footprintCost(start.pose.position.x, start.pose.position.y, yaw, footprint);
+        return (footprint_cost>=0);
+    }
+
     // base_local_planner::Trajectory MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds)
     // void MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
     void MpnetPlanner::getPath(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)

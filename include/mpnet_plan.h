@@ -112,6 +112,9 @@ namespace mpnet_local_planner{
          */
         bool isStateValid(const ob::State *state);
 
+        bool isStateValid(geometry_msgs::PoseStamped start);
+
+
         bool isInitialized()
         {
             return initialized_;
