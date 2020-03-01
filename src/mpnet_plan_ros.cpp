@@ -11,6 +11,8 @@
 
 #include <tf2/utils.h>
 
+#include <std_srvs/Empty.h>
+
 #include <pluginlib/class_list_macros.h>
 
 // Register this planner
@@ -54,6 +56,7 @@ namespace mpnet_local_planner{
             ros::NodeHandle private_nh("~/"+name);  
             l_plan_pub_ = private_nh.advertise<nav_msgs::Path>("local_plan", 1);
             g_plan_pub_ = private_nh.advertise<nav_msgs::Path>("global_plan", 1);
+            resetController = private_nh.serviceClient<std_srvs::Empty>("/reset_controller");
 
             navigation_costmap_ros_ = costmap_ros;
             costmap_ = navigation_costmap_ros_->getCostmap();
@@ -111,6 +114,11 @@ namespace mpnet_local_planner{
         global_plan_.clear();
         local_plan.clear();
         path.resetPoints();
+        std_srvs::Empty callController;
+        if (resetController.call(callController))
+            ROS_INFO("Reset the controller");
+        else
+            ROS_INFO("Was not able to reset the controller");
         global_plan_ = orig_global_plan;
 
         reached_goal_ = false;
@@ -164,6 +172,7 @@ namespace mpnet_local_planner{
         double global_yaw = tf2::getYaw(global_pose.pose.orientation);
         double yaw_from_goal = angles::shortest_angular_distance(global_yaw, angle);
         // if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
+        ROS_INFO("goal tolerance: %f", xy_goal_tolerance);
         if (xydist_from_goal<=xy_goal_tolerance)
         {
             ROS_INFO("Reach Goal");
