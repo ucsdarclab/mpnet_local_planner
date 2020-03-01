@@ -122,7 +122,7 @@ namespace mpnet_local_planner{
 			// }
 			ROS_INFO("x: [%f], y:[%f], th:[%f], goalx: [%f], goaly: [%f]", x, y, th, path_goal.at(0), path_goal.at(1));
 		}
-		if (pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2) < 0.1*0.1 || path_x.size()<1 || reached == true){
+		if (pow( x - path_goal.at(0), 2)+ pow( y - path_goal.at(1), 2) < 0.2*0.2 || path_x.size()<1 || reached == true){
 			// reached
 			// curr = 0;
 			// std::cout<<"reached"<<std::endl;
@@ -177,11 +177,13 @@ namespace mpnet_local_planner{
 
 			double steer_value = r[0]; /// (deg2rad(25)*Lf);
 			double throttle_value = r[1]; //r[1]*(1-fabs(steer_value))+0.1;
-			double velocity_value = vel + throttle_value * dt;  
-			
+			// double velocity_value = vel + throttle_value * dt;  
+			double velocity_value = ref_v;
+
 			_ackermann_msg.drive.steering_angle = steer_value;
 			_ackermann_msg.drive.speed = velocity_value;
 			// _ackermann_msg.drive.acceleration = throttle_value;//throttle_value;
+
 			if(verbose){
 				ROS_INFO("sta: [%f], v:[%f], a:[%f]", steer_value, velocity_value, throttle_value);
 			}

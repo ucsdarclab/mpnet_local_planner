@@ -6,16 +6,14 @@ MpnetLocalPlanner:
   # model_file: /root/data/mymap/trained_models/mpnet_model_299.pt
   # model_file: /root/data/grid_world_2_0_06/trained_models/mpnet_model_299.pt
 
+
   # Number of Plans
   num_samples: 4
   num_paths: 2
 
   # Goal Tolerance
   xy_goal_tolerance: 0.2
-  yaw_goal_tolerance: 0.2
-
-  # Define bounds for the RRT* planner
-  
+  yaw_goal_tolerance: 0.1
 
   # Replanning parameters
   xy_replan_tolerance: 1.0

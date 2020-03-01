@@ -18,23 +18,23 @@ class FG_eval {
     for (int t = 0; t < N; t++) {
       // fg[0] += 100.0*CppAD::pow(vars[cte_start + t], 2);
       // fg[0] += 100.0*CppAD::pow(vars[epsi_start + t], 2);
-      fg[0] += 500 *CppAD::pow(vars[x_start + t]-tgx[t], 2);
-      fg[0] += 500 *CppAD::pow(vars[y_start + t]-tgy[t], 2);
-      fg[0] += 100 *CppAD::pow(vars[v_start + t]- ref_v, 2);
+      fg[0] += 500 *CppAD::pow(vars[x_start + t]-tgx[t], 2) * CppAD::pow(0.8, t);
+      fg[0] += 500 *CppAD::pow(vars[y_start + t]-tgy[t], 2) * CppAD::pow(0.8, t);
+      // fg[0] += 50 *CppAD::pow(vars[v_start + t]- ref_v, 2);
       // fg[0] += 10*(CppAD::pow(vars[x_start + t] - goal[0], 2)+CppAD::pow(vars[y_start + t] - goal[1], 2));
     }
 
-    fg[0] += 500 * CppAD::pow(vars[x_start + N-1]-tgx[N-1], 2);
-    fg[0] += 500 * CppAD::pow(vars[y_start + N-1]-tgy[N-1], 2);
+    // fg[0] += 500 * CppAD::pow(vars[x_start + N-1]-tgx[N-1], 2);
+    // fg[0] += 500 * CppAD::pow(vars[y_start + N-1]-tgy[N-1], 2);
 
-    for (int t = 0; t < N - 1; t++) {
-      fg[0] += 1*CppAD::pow(vars[delta_start + t], 2);
-      fg[0] += 1*CppAD::pow(vars[a_start + t], 2);
-    }
+    // for (int t = 0; t < N - 1; t++) {
+    //   fg[0] += 1*CppAD::pow(vars[delta_start + t], 2);
+    //   fg[0] += 1*CppAD::pow(vars[a_start + t], 2);
+    // }
 
     for (int t = 0; t < N - 2; t++) {
-      fg[0] += 50*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-      fg[0] += 10*CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+      fg[0] += 0.1*CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+      // fg[0] += 0.1*CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
     }
     // terminal loss
     fg[1 + x_start] = vars[x_start];
@@ -63,10 +63,10 @@ class FG_eval {
         // AD<double> epsi0 = vars[epsi_start + t - 1];
         AD<double> delta0 = vars[delta_start + t - 1];
         AD<double> a0 = vars[a_start + t - 1];
-        fg[1 + x_start + t] = x1 - (x0 + v0 * CppAD::cos(psi0) * dt);
-        fg[1 + y_start + t] = y1 - (y0 + v0 * CppAD::sin(psi0) * dt);
-        fg[1 + psi_start + t] = psi1 - (psi0 + v0 * delta0 / Lf * dt);
-        fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
+        fg[1 + x_start + t] = x1 - (x0 + ref_v * CppAD::cos(psi0) * dt);
+        fg[1 + y_start + t] = y1 - (y0 + ref_v * CppAD::sin(psi0) * dt);
+        fg[1 + psi_start + t] = psi1 - (psi0 + ref_v * delta0 / Lf * dt);
+        // fg[1 + v_start + t] = v1 - (v0 + a0 * dt);
       }
     }
   }
@@ -116,7 +116,7 @@ vector<double> MPC::Solve(std::vector<double> state, std::vector<double> ptsx, s
   }
 
   for (i = delta_start; i < a_start; i++) {
-    vars_lowerbound[i] =  -0.5; 
+    vars_lowerbound[i] =  -0.5  ; 
     vars_upperbound[i] =  0.5; 
   }
 
@@ -160,7 +160,7 @@ vector<double> MPC::Solve(std::vector<double> state, std::vector<double> ptsx, s
   options += "Sparse  true        reverse\n";
   // NOTE: Currently the solver has a maximum time limit of 0.5 seconds.
   // Change this as you see fit.
-  options += "Numeric max_cpu_time          0.1\n";
+  options += "Numeric max_cpu_time          0.05\n";
 
   // place to return solution
   CppAD::ipopt::solve_result<Dvector> solution;

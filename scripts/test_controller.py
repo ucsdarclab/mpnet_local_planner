@@ -16,7 +16,7 @@ class RobotCommand():
         vx = msg.linear.x
         vy = msg.linear.y
         theta_dot = msg.angular.z
-        d = 0.325
+        d = 0.324
         # TODO : Need to update the steering angle
         speed = np.hypot(theta_dot*d, np.hypot(vx,vy))
         action = AckermannDriveStamped()
