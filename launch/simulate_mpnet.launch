@@ -6,10 +6,10 @@
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/building_31.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_1f_full_tuned_edit.yaml"/>-->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_6f_icra2019_fx_net.yaml"/> -->
-  <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2.yaml"/>
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/unknown.yaml"/> -->
-  <!-- <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/> -->
+  <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/>
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/narrowPassage.yaml"/> -->
 
 
