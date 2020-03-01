@@ -48,11 +48,8 @@
   </node>
 
   <node pkg="mpnet_plan" type="controller_node" respawn="true" name="controller_node" output="screen"/>
-<<<<<<< HEAD
-  
-=======
 
->>>>>>> f4e3a6648e9ad6adf4bb1eb5037233916766559f
+
   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find mpnet_plan)/launch/mpnet_launch.rviz" />
   <!-- <node type="rviz" name="rviz" pkg="rviz"/> -->
 
