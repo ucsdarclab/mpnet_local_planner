@@ -93,6 +93,7 @@ namespace mpnet_local_planner{
              */
             MpnetLocalPlanner(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros);
             
+            double distanceBetweenPoints(geometry_msgs::PoseStamped from, geometry_msgs::PoseStamped to);
             /**
              * @brief A function to prune the local plan
              * @param global_pose

@@ -218,15 +218,12 @@ namespace mpnet_local_planner{
                 base_local_planner::Trajectory new_path;
                 auto start_time = std::chrono::high_resolution_clock::now();
                 tc_->getPath(global_pose, goal_point, spaceBound, new_path);
+                // tc_->getPathRRT_star(global_pose, goal_point, new_path);
+
                 auto stop_time = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-                // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+                ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
                 // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
-                ROS_INFO("Number of points in local path: %lud", local_plan.size());
-                if (!local_plan.empty())
-                    pruneLocalPlan(global_pose, local_plan);
-                ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
-
 
                 if (new_path.getPointsSize()>1) 
                 {
@@ -239,6 +236,11 @@ namespace mpnet_local_planner{
                     // if (local_plan.size()<=50)
                     if (xydist_from_goal<=xy_goal_tolerance || local_plan.size()==0)
                     {
+                        ROS_INFO("Number of points in local path: %lud", local_plan.size());
+                        if (!local_plan.empty())
+                            pruneLocalPlan(global_pose, local_plan);
+                        ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
+
                         new_path.resetPoints();
                         tc_->getPathRRT_star(global_pose, goal_point, new_path);
                         // Check if we can connect the new_path and old_path
