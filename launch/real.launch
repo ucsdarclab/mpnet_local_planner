@@ -11,25 +11,22 @@
     <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06_small.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/unknown.yaml"/> -->
-  <arg name="map" default="$(find racecar_simulator)/maps/mymap2.yaml"/>
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/> -->
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_small.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/narrowPassage.yaml"/> -->
-
-
-  <node pkg="map_server" name="map_server" type="map_server" args="$(arg map)"/>
-  
+  <!-- <node pkg="map_server" name="map_server" type="map_server" args="$(arg map)"/> -->
   <!-- Launch the racecar model -->
-  <include file="$(find racecar_simulator)/launch/racecar_model.launch"/>
+  <!-- <include file="$(find racecar_simulator)/launch/racecar_model.launch"/> -->
 
   <!-- Begin the simulator with the parameters from params.yaml -->
-  <node pkg="racecar_simulator" name="racecar_simulator" type="simulate" output="screen">
-    <rosparam command="load" file="$(find racecar_simulator)/params.yaml"/>
-  </node>
+  <!-- <node pkg="racecar_simulator" name="racecar_simulator" type="simulate" output="screen"> -->
+    <!-- <rosparam command="load" file="$(find racecar_simulator)/params.yaml"/> -->
+  <!-- </node> -->
   
-  <group ns="static_tf">
+  <!-- <group ns="static_tf">
     <node name="base_to_laser_tf2" pkg="tf2_ros" type="static_transform_publisher"
         args="0.1 0.0 0.30 0.0 0.0 0.0 base_link laser" />
-  </group>
+  </group> -->
 
   <!-- <include file="$(find amcl)/examples/amcl_diff.launch" /> -->
   
@@ -50,6 +47,7 @@
 
   <node pkg="mpnet_plan" type="controller_node" respawn="true" name="controller_node" output="screen"/>
   <!-- <node pkg="mpnet_plan" type="pure_pursuit.py" respawn="true" name="pure_pursuit" output="screen"/> -->
+  <!-- <include file="$(find nuc_navigation)/launch/amcl_diff.launch"/> -->
 
 
   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find  mpnet_plan)/launch/mpnet_launch.rviz" />
