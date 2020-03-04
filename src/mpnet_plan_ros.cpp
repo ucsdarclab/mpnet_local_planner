@@ -300,18 +300,22 @@ namespace mpnet_local_planner{
         }
         return reached_goal_;
     }
+    
+    double MpnetLocalPlanner::distanceBetweenPoints(geometry_msgs::PoseStamped from, geometry_msgs::PoseStamped to)
+    {
+        double x_diff = from.pose.position.x - to.pose.position.x;
+        double y_diff = from.pose.position.y - to.pose.position.y;
+        return x_diff * x_diff + y_diff * y_diff;
+    }
 
     void MpnetLocalPlanner::pruneLocalPlan(const geometry_msgs::PoseStamped& global_pose, std::vector<geometry_msgs::PoseStamped>& plan)
     {
         std::vector<geometry_msgs::PoseStamped>::iterator it = plan.begin();
         while(it != plan.end()){
             const geometry_msgs::PoseStamped& w = *it;
-            // Fixed error bound of 2 meters for now. Can reduce to a portion of the map size or based on the resolution
-            double x_diff = global_pose.pose.position.x - w.pose.position.x;
-            double y_diff = global_pose.pose.position.y - w.pose.position.y;
-            double distance_sq = x_diff * x_diff + y_diff * y_diff;
-            if(distance_sq < 0.01){
-                ROS_DEBUG("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
+            double distance_sq = distanceBetweenPoints(w, global_pose);
+            if(distance_sq < 0.001){
+                ROS_INFO("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
                 break;
             }
             it = plan.erase(it);
