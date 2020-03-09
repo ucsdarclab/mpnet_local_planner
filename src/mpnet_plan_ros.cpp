@@ -27,8 +27,8 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL),
-    controller(false)
+    tc_(NULL)
+    // controller(false)
     {}
     
     MpnetLocalPlanner::MpnetLocalPlanner(std::string name, tf2_ros::Buffer* tf, costmap_2d::Costmap2DROS* costmap_ros):
@@ -36,8 +36,8 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL),
-    controller(false)
+    tc_(NULL)
+    // controller(false)
     {
         initialize(name, tf, costmap_ros);
     }

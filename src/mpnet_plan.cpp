@@ -100,10 +100,10 @@ namespace mpnet_local_planner{
             // bounds->setHigh(0,13.5);
             // bounds->setHigh(1,14.0);
 
-            bounds->setLow(0,-20);
-            bounds->setLow(1,-20);
-            bounds->setHigh(0,20);
-            bounds->setHigh(1,20);
+            bounds->setLow(0,-100);
+            bounds->setLow(1,-100);
+            bounds->setHigh(0,100);
+            bounds->setHigh(1,100);
             
             bounds->setLow(2,-M_PI);
             bounds->setHigh(2,M_PI);

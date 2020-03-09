@@ -32,14 +32,14 @@
   
   <node pkg="move_base" type="move_base" respawn="true" name="move_base" output="screen">
   <!-- <node pkg="move_base" type="move_base" respawn="false" name="move_base" output="screen" launch-prefix="xterm -e gdb "> -->
-    <rosparam file="$(find racecar_simulator)/params/costmap_common_config.yaml" command="load" ns="global_costmap" /> 
-    <rosparam file="$(find racecar_simulator)/params/costmap_common_config.yaml" command="load" ns="local_costmap" />
-    <rosparam file="$(find racecar_simulator)/params/costmap_common_config.yaml" command="load" ns="collision_costmap"/>
-    <rosparam file="$(find racecar_simulator)/params/local_costmap_param.yaml" command="load" />
-    <rosparam file="$(find racecar_simulator)/params/global_costmap_param.yaml" command="load" /> 
+    <rosparam file="$(find mpnet_plan)/params/costmap_common_config.yaml" command="load" ns="global_costmap" /> 
+    <rosparam file="$(find mpnet_plan)/params/costmap_common_config.yaml" command="load" ns="local_costmap" />
+    <rosparam file="$(find mpnet_plan)/params/costmap_common_config.yaml" command="load" ns="collision_costmap"/>
+    <rosparam file="$(find mpnet_plan)/params/local_costmap_param.yaml" command="load" />
+    <rosparam file="$(find mpnet_plan)/params/global_costmap_param.yaml" command="load" /> 
     <rosparam file="$(find mpnet_plan)/params/collision_costmap_param.yaml" command="load" /> 
     <param name="base_local_planner" value="mpnet_local_planner/MpnetLocalPlanner" />
-    <param name="controller_frequency" value="20.0"/>
+    <param name="controller_frequency" value="5.0"/>
     <!-- <param name="controller_patience" value="15.0"/> -->
 
     <rosparam file="$(find mpnet_plan)/params/local_planner.yaml" command="load" />
