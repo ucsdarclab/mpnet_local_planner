@@ -2,11 +2,13 @@
 namespace mpnet_local_planner{
 
 	Controller::Controller():
-	verbose(true)
+	verbose(true),
+	tf2_listener(tfBuffer)
 	{}
 
 	Controller::Controller(bool verbose):
-	verbose(verbose)
+	verbose(verbose),
+	tf2_listener(tfBuffer)
 	{}
 
 	Controller::~Controller(){}
@@ -41,10 +43,26 @@ namespace mpnet_local_planner{
 
 	void Controller::get_path(const nav_msgs::Path::ConstPtr& msg)
 	{
-		std::vector<geometry_msgs::PoseStamped> poses = msg->poses;
+		std::vector<geometry_msgs::PoseStamped> poses;
+		if (msg->header.frame_id=="map")
+		{
+			geometry_msgs::TransformStamped map_to_odom;
+			map_to_odom = tfBuffer.lookupTransform("odom","map", ros::Time(0), ros::Duration(2.0) );
+			for (int j=0;j<msg->poses.size();j++)
+			{
+				geometry_msgs::PoseStamped p;
+				tf2::doTransform(msg->poses[j], p, map_to_odom);
+				poses.push_back(p);
+			}
+		}
+		else
+		{
+			poses = msg->poses;
+		}
+		
 		// std::cout<<poses.size()<<std::endl;
 		// int k = 2;
-		int k = 4;
+		int k = 3;
 		int length = poses.size()>(std::size_t)(N*k) ? N: poses.size(), start = 0;
 		
 		double min = 1e10;
@@ -266,8 +284,8 @@ namespace mpnet_local_planner{
 
 			double steer_value = r[0]; /// (deg2rad(25)*Lf);
 			double throttle_value = r[1]; //r[1]*(1-fabs(steer_value))+0.1;
-			// double velocity_value = vel + throttle_value * dt;  
-			double velocity_value = ref_v;
+			double velocity_value = vel + throttle_value * dt;  
+			// double velocity_value = ref_v;
 			if(verbose){
 				ROS_INFO("sta: [%f], v:[%f], a:[%f]", steer_value, velocity_value, throttle_value);
 			}
