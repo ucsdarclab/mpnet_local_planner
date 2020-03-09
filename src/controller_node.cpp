@@ -10,7 +10,8 @@ int main(int argc, char **argv)
         ackermann_msgs::AckermannDriveStamped control_msg;
         nav_msgs::Odometry base_odom;
 		ros::Subscriber path = n.subscribe("/move_base/MpnetLocalPlanner/local_plan", 2, &mpnet_local_planner::Controller::get_path, &controller);
-		ros::Publisher control = n.advertise<ackermann_msgs::AckermannDriveStamped>("/vesc/high_level/ackermann_cmd_mux/input/nav_0", 10);
+		// ros::Publisher control = n.advertise<ackermann_msgs::AckermannDriveStamped>("/vesc/high_level/ackermann_cmd_mux/input/nav_0", 10);
+        ros::Publisher control = n.advertise<ackermann_msgs::AckermannDriveStamped>("/drive", 10);
         ros::ServiceServer resetController = n.advertiseService("reset_controller", &mpnet_local_planner::Controller::resetController, &controller);
         ros::Rate loop_rate(10);
         ros::spinOnce();
