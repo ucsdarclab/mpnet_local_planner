@@ -11,8 +11,8 @@
     <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06_small.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/unknown.yaml"/> -->
-  <arg name="map" default="$(find racecar_simulator)/maps/mymap2.yaml"/>
-  <!-- <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/> -->
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/mymap2.yaml"/> -->
+  <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/>
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/narrowPassage.yaml"/> -->
 
 
@@ -43,8 +43,8 @@
     <rosparam file="$(find mpnet_plan)/params/local_planner.yaml" command="load" />
   </node>
 
-  <node pkg="mpnet_plan" type="controller_node" respawn="true" name="controller_node" output="screen"/>
-  <!-- <node pkg="mpnet_plan" type="pure_pursuit.py" respawn="true" name="pure_pursuit" output="screen"/> -->
+  <!-- <node pkg="mpnet_plan" type="controller_node" respawn="true" name="controller_node" output="screen"/> -->
+  <node pkg="mpnet_plan" type="pure_pursuit_controller.py" respawn="true" name="pure_pursuit" output="screen"/>
 
 
   <node type="rviz" name="rviz" pkg="rviz" args="-d $(find  mpnet_plan)/launch/mpnet_launch.rviz" />
