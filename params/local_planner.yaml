@@ -8,9 +8,9 @@ MpnetLocalPlanner:
 
 
   # Number of Plans
-  replanning_freq: 5
+  replanning_freq: 20
   num_samples: 5
-  num_paths: 5
+  num_paths: 10
 
   # Goal Tolerance
   xy_goal_tolerance: 0.2
@@ -21,3 +21,4 @@ MpnetLocalPlanner:
 
   # Actual footprint of the robot
   footprint: [[0.4064,0.122],[-0.1524,0.122],[-0.1524,-0.122],[0.4064,-0.122]]
+  goal_tolerance_bound: [[-0.2, 0.2], [0.2, 0.2], [0.2, -0.2], [-0.2,-0.2]]
