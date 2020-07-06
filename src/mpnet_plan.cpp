@@ -331,16 +331,6 @@ namespace mpnet_local_planner{
                 target_pose[1] = targetPose[1];
                 target_pose[2] = targetPose[2];
 
-                // // // Only for debugging purposes
-                // nextPose.pose.pose.position.x =  targetPose[0];
-                // nextPose.pose.pose.position.y = targetPose[1];
-                // nextPose.pose.pose.position.z = 0;
-
-                // nextPose.pose.pose.orientation.z = sin(targetPose[2]/2);
-                // nextPose.pose.pose.orientation.w = cos(targetPose[2]/2);
-                // target_robot_pub.publish(nextPose);
-                // ros::spinOnce();
-                // rate.sleep();
                 og::PathGeometric pathFromStart=og::PathGeometric(si, start_ompl(), target_pose());
                 isStartValid = pathFromStart.check();
                 
@@ -367,6 +357,15 @@ namespace mpnet_local_planner{
         }
         if (isGoalValid)
         {
+            // // Only for debugging purposes
+            nextPose.pose.pose.position.x =  goal_ompl[0];
+            nextPose.pose.pose.position.y = goal_ompl[1];
+            nextPose.pose.pose.position.z = 0;
+
+            nextPose.pose.pose.orientation.z = sin(goal_ompl[2]/2);
+            nextPose.pose.pose.orientation.w = cos(goal_ompl[2]/2);
+            target_robot_pub.publish(nextPose);
+
             // Simplify solution
             std::size_t numStates = FinalPathFromStart.getStateCount();
             psk->simplifyMax(FinalPathFromStart);
