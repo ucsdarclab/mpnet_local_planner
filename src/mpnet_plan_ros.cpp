@@ -28,7 +28,8 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL)
+    tc_(NULL),
+    set_prev_goal(false)
     // controller(false)
     {}
     
@@ -37,7 +38,8 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL)
+    tc_(NULL),
+    set_prev_goal(false)
     // controller(false)
     {
         initialize(name, tf, costmap_ros);
@@ -191,6 +193,17 @@ namespace mpnet_local_planner{
         goal_point.pose.orientation.z = sin(angle/2);
         goal_point.pose.orientation.w = cos(angle/2);
 
+        // Check to see if prev_goal has been set 
+        if (!set_prev_goal)
+        {
+            prev_goal_point = goal_point;
+        }
+        // Check to see if prev_goal point is near the current goal point, if so don't change
+        double xydist_from_prev_goal = std::hypot(goal_point.pose.position.x-prev_goal_point.pose.position.x, goal_point.pose.position.y-prev_goal_point.pose.position.y);
+        if (xydist_from_prev_goal <= xy_goal_tolerance)
+        {
+            goal_point = prev_goal_point;
+        }
         // Check to see goal tolerance
         double xydist_from_goal = std::hypot(goal_point.pose.position.x-global_pose.pose.position.x, goal_point.pose.position.y-global_pose.pose.position.y);
         double global_yaw = tf2::getYaw(global_pose.pose.orientation);

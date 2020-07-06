@@ -133,6 +133,8 @@ namespace mpnet_local_planner{
 
             std::vector<geometry_msgs::Point> robot_footprint;
             std::vector<geometry_msgs::Point> goal_region_footprint;
+            geometry_msgs::PoseStamped prev_goal_point;
+            bool set_prev_goal;
             // Controller controller;
             OdometryHelperRos odom_helper_;
             int plan_freq, plan_freq_count;
