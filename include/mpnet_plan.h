@@ -139,6 +139,7 @@ namespace mpnet_local_planner{
         ob::StateSpacePtr space;
         ob::RealVectorBounds* bounds;
         std::shared_ptr<ob::SpaceInformation> si;
+        std::shared_ptr<og::PathSimplifier> psk;
         std::shared_ptr<og::RRTstar> planAlgo;
         double g_tolerance, yaw_tolerance; /** @brief The threshold for goal */
         int num_samples, num_paths;

@@ -19,6 +19,8 @@
 
 #include <angles/angles.h>
 
+#include <ompl/geometric/SimpleSetup.h>
+namespace og = ompl::geometric;
 
 namespace mpnet_local_planner{
     
@@ -115,7 +117,8 @@ namespace mpnet_local_planner{
                 return this->isStateValid(state);
             }
             );
-            
+            psk = std::make_shared<og::PathSimplifier>(si);
+
             planAlgo = std::make_shared<og::RRTstar>(si);
             planAlgo->setRange(0.2);
             planAlgo->setTreePruning(true);
@@ -364,6 +367,10 @@ namespace mpnet_local_planner{
         }
         if (isGoalValid)
         {
+            // Simplify solution
+            std::size_t numStates = FinalPathFromStart.getStateCount();
+            psk->simplifyMax(FinalPathFromStart);
+            ROS_INFO("States changed from %d to %d", numStates, FinalPathFromStart.getStateCount());
             FinalPathFromStart.interpolate();
             // std::cout << FinalPathFromStart.getStateCount() << std::endl;
             // TODO: Maybe this can be made faster?
