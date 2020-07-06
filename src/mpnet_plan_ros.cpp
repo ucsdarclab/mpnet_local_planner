@@ -60,6 +60,7 @@ namespace mpnet_local_planner{
             g_plan_pub_ = private_nh.advertise<nav_msgs::Path>("global_plan", 1);
             footprintPolygon = private_nh.advertise<geometry_msgs::PolygonStamped>("robot_footprint",1);
             resetController = private_nh.serviceClient<std_srvs::Empty>("/reset_controller");
+            goal_footprint_pub = private_nh.advertise<geometry_msgs::PolygonStamped>("goal_footprint", 1);
 
             navigation_costmap_ros_ = costmap_ros;
             costmap_ = navigation_costmap_ros_->getCostmap();
@@ -67,6 +68,7 @@ namespace mpnet_local_planner{
             // ---------Set parameters of the model ----------------
             // Load network model from reading the parameter file
             std::string file_name;
+            XmlRpc::XmlRpcValue goal_footprint;
             double g_tolerance, yaw_tolerance;
             if (private_nh.getParam("model_file", file_name))
             {
@@ -80,6 +82,10 @@ namespace mpnet_local_planner{
                 xy_goal_tolerance = g_tolerance;
                 yaw_goal_tolerance = yaw_tolerance;
 
+                // Set up the goal footprint
+                std::string error;
+                private_nh.getParam("goal_tolerance_bound", goal_footprint);
+                goal_region_footprint = costmap_2d::makeFootprintFromXMLRPC(goal_footprint, "goal_tolerance_bound");
                 // Planning parameters
                 int numSamples, numPaths, replanning_freq;
                 private_nh.param("replanning_freq", replanning_freq, 0);
@@ -148,8 +154,9 @@ namespace mpnet_local_planner{
             return false;
         }
 
-        geometry_msgs::PolygonStamped oriented_footprint;
+        geometry_msgs::PolygonStamped oriented_footprint, goal_footprint;
         oriented_footprint.header.frame_id = global_frame_;
+        goal_footprint.header.frame_id = global_frame_;
         double yaw = tf2::getYaw(global_pose.pose.orientation);
         costmap_2d::transformFootprint(global_pose.pose.position.x, global_pose.pose.position.y, yaw, robot_footprint, oriented_footprint);
         footprintPolygon.publish(oriented_footprint);
@@ -286,6 +293,17 @@ namespace mpnet_local_planner{
         // Publish information to the visualizer
         base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
         base_local_planner::publishPlan(local_plan, l_plan_pub_);
+        // Publish Polygon
+        geometry_msgs::Polygon fp_poly;
+        for(unsigned int i=0; i<goal_region_footprint.size(); i++)
+        {
+            geometry_msgs::Point32 p;
+            p.x = goal_region_footprint[i].x + goal_point.pose.position.x;
+            p.y = goal_region_footprint[i].y + goal_point.pose.position.y;
+            fp_poly.points.push_back(p);
+        }
+        goal_footprint.polygon = fp_poly;
+        goal_footprint_pub.publish(goal_footprint);
 
         cmd_vel.linear.x = 0.0;
         cmd_vel.linear.y = 0.0;
