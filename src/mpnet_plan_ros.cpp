@@ -16,6 +16,7 @@
 #include <pluginlib/class_list_macros.h>
 
 #include <costmap_2d/footprint.h>
+#include <costmap_2d/array_parser.h>
 
 // Register this planner
 PLUGINLIB_EXPORT_CLASS(mpnet_local_planner::MpnetLocalPlanner, nav_core::BaseLocalPlanner)
