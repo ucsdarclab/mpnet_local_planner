@@ -182,17 +182,31 @@ namespace mpnet_local_planner{
             return false;
 
         geometry_msgs::PoseStamped goal_point = transformed_plan.back();
-        geometry_msgs::PoseStamped goal_point_minus=transformed_plan.end()[-2];
 
-        // Calculate the distance of the vector
-        double diff_x = goal_point.pose.position.x - goal_point_minus.pose.position.x;
-        double diff_y = goal_point.pose.position.y - goal_point_minus.pose.position.y;
+        // Check if the global plan is near the terminating point
+        geometry_msgs::PoseStamped global_goal_point = global_plan_.back();
+        double thresh = std::hypot(
+            goal_point.pose.position.x-global_goal_point.pose.position.x,
+            goal_point.pose.position.y-global_goal_point.pose.position.y
+            );
+        if (thresh<0.05)
+        {
+            goal_point = global_goal_point;
+        }
+        else
+        {
+            geometry_msgs::PoseStamped goal_point_minus=transformed_plan.end()[-2];
 
-        double vec_len = sqrt(diff_x*diff_x + diff_y *diff_y);
-        double angle = atan2(diff_y, diff_x);
-        goal_point.pose.orientation.z = sin(angle/2);
-        goal_point.pose.orientation.w = cos(angle/2);
+            // Calculate the distance of the vector
+            double diff_x = goal_point.pose.position.x - goal_point_minus.pose.position.x;
+            double diff_y = goal_point.pose.position.y - goal_point_minus.pose.position.y;
 
+            double vec_len = sqrt(diff_x*diff_x + diff_y *diff_y);
+            double angle = atan2(diff_y, diff_x);
+            goal_point.pose.orientation.z = sin(angle/2);
+            goal_point.pose.orientation.w = cos(angle/2);
+        }
+        double angle = atan2(goal_point.pose.orientation.z, goal_point.pose.orientation.w)*2;
         // Check to see if prev_goal has been set 
         if (!set_prev_goal)
         {
