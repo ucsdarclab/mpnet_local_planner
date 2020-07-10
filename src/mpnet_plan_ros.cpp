@@ -209,6 +209,17 @@ namespace mpnet_local_planner{
             goal_point.pose.orientation.w = cos(angle/2);
         }
         double angle = atan2(goal_point.pose.orientation.z, goal_point.pose.orientation.w)*2;
+        // Check if the path end is near the goal point
+        double pe_x, pe_y, pe_yaw;
+        if(path.getPointsSize()>1)
+            path.getEndpoint(pe_x, pe_y, pe_yaw);
+            // Check to see if prev_goal point is near the current goal point, if so don't change
+            float xydist_from_prev_goal = std::hypot(
+                goal_point.pose.position.x-pe_x,
+                goal_point.pose.position.y-pe_y
+                );
+            float yaw_from_prev_goal = angles::shortest_angular_distance(pe_yaw, angle);
+
         // Check to see if prev_goal has been set 
         if (!set_prev_goal)
         {
@@ -263,7 +274,18 @@ namespace mpnet_local_planner{
 
                 if (new_path.getPointsSize()>1) 
                 {
-                    path = new_path;
+                    ROS_INFO("Old path cost: %f , New path cost: %f",path.cost_, new_path.cost_);
+                    ROS_INFO("Distance from previous goal: %f", xydist_from_prev_goal);
+                    ROS_INFO("Yaw from previous goal: %f", yaw_from_prev_goal);
+                    // check if the path length of the new path is worse or better, if
+                    // the new path plans for a path near the goal point
+                    if(xydist_from_prev_goal>=0.01 || fabs(yaw_from_prev_goal)>=0.1)
+                        path = new_path;
+                    else 
+                    {
+                        if(new_path.cost_<=path.cost_ || path.cost_<0)
+                            path = new_path;
+                    }
                     valid_local_path = true;
                 }
                 else
