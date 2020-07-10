@@ -28,7 +28,7 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL),
+    tc_(NULL)
     // controller(false)
     {}
     
@@ -37,7 +37,7 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL),
+    tc_(NULL)
     // controller(false)
     {
         initialize(name, tf, costmap_ros);
