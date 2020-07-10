@@ -369,7 +369,7 @@ namespace mpnet_local_planner{
             // Simplify solution
             std::size_t numStates = FinalPathFromStart.getStateCount();
             psk->simplifyMax(FinalPathFromStart);
-            ROS_INFO("States changed from %d to %d", numStates, FinalPathFromStart.getStateCount());
+            
             FinalPathFromStart.interpolate();
             // std::cout << FinalPathFromStart.getStateCount() << std::endl;
             // TODO: Maybe this can be made faster?
