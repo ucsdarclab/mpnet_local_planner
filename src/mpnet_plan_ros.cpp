@@ -189,6 +189,8 @@ namespace mpnet_local_planner{
             goal_point.pose.position.x-global_goal_point.pose.position.x,
             goal_point.pose.position.y-global_goal_point.pose.position.y
             );
+        // If local path goal is near global goal, set target goal orientation to the 
+        // global goal orientation
         if (thresh<0.05)
         {
             goal_point = global_goal_point;
