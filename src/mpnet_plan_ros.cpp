@@ -29,7 +29,6 @@ namespace mpnet_local_planner{
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
     tc_(NULL),
-    set_prev_goal(false)
     // controller(false)
     {}
     
@@ -39,7 +38,6 @@ namespace mpnet_local_planner{
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
     tc_(NULL),
-    set_prev_goal(false)
     // controller(false)
     {
         initialize(name, tf, costmap_ros);
@@ -220,17 +218,6 @@ namespace mpnet_local_planner{
                 );
             float yaw_from_prev_goal = angles::shortest_angular_distance(pe_yaw, angle);
 
-        // Check to see if prev_goal has been set 
-        if (!set_prev_goal)
-        {
-            prev_goal_point = goal_point;
-        }
-        // Check to see if prev_goal point is near the current goal point, if so don't change
-        double xydist_from_prev_goal = std::hypot(goal_point.pose.position.x-prev_goal_point.pose.position.x, goal_point.pose.position.y-prev_goal_point.pose.position.y);
-        if (xydist_from_prev_goal <= xy_goal_tolerance)
-        {
-            goal_point = prev_goal_point;
-        }
         // Check to see goal tolerance
         double xydist_from_goal = std::hypot(goal_point.pose.position.x-global_pose.pose.position.x, goal_point.pose.position.y-global_pose.pose.position.y);
         double global_yaw = tf2::getYaw(global_pose.pose.orientation);
@@ -290,29 +277,24 @@ namespace mpnet_local_planner{
                 }
                 else
                 {
-                    xydist_from_goal = std::hypot(prev_goal.pose.position.x-global_pose.pose.position.x, prev_goal.pose.position.y-global_pose.pose.position.y);
-                    // if (local_plan.size()<=50)
-                    if (xydist_from_goal<=xy_goal_tolerance || local_plan.size()==0)
-                    {
-                        ROS_INFO("Number of points in local path: %lud", local_plan.size());
-                        if (!local_plan.empty())
-                            pruneLocalPlan(global_pose, local_plan);
-                        ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
+                    ROS_INFO("Number of points in local path: %lud", local_plan.size());
+                    if (!local_plan.empty())
+                        pruneLocalPlan(global_pose, local_plan);
+                    ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
 
-                        new_path.resetPoints();
-                        tc_->getPathRRT_star(global_pose, goal_point, new_path);
-                        // Check if we can connect the new_path and old_path
-                        if (new_path.getPointsSize()>1)
-                        {
-                            ROS_INFO("Path from RRT star");
-                            path = new_path;
-                            valid_local_path = true;
-                        }
-                        else
-                        {
-                            ROS_INFO("Did not find a path in the initial search");
-                            return false;        
-                        }
+                    new_path.resetPoints();
+                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                    // Check if we can connect the new_path and old_path
+                    if (new_path.getPointsSize()>1)
+                    {
+                        ROS_INFO("Path from RRT star");
+                        path = new_path;
+                        valid_local_path = true;
+                    }
+                    else
+                    {
+                        ROS_INFO("Did not find a path in the initial search");
+                        return false;        
                     }
                 
                 }
