@@ -369,7 +369,8 @@ namespace mpnet_local_planner{
             // Simplify solution
             std::size_t numStates = FinalPathFromStart.getStateCount();
             psk->simplifyMax(FinalPathFromStart);
-            
+            // TODO : Check this interpolate function on the number of points it takes to generate a 
+            // feasilble path.
             FinalPathFromStart.interpolate();
             traj.cost_ = FinalPathFromStart.length();
             // std::cout << FinalPathFromStart.getStateCount() << std::endl;
