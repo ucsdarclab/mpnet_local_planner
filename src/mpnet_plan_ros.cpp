@@ -222,9 +222,8 @@ namespace mpnet_local_planner{
         double xydist_from_goal = std::hypot(goal_point.pose.position.x-global_pose.pose.position.x, goal_point.pose.position.y-global_pose.pose.position.y);
         double global_yaw = tf2::getYaw(global_pose.pose.orientation);
         double yaw_from_goal = angles::shortest_angular_distance(global_yaw, angle);
-        // if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
-        // ROS_INFO("goal tolerance: %f", xy_goal_tolerance);
-        if (xydist_from_goal<=xy_goal_tolerance)
+        // Check both xy distance and yaw difference for goal termination
+        if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
         {
             ROS_INFO("Reach Goal");
             cmd_vel.linear.x = 0.0;
