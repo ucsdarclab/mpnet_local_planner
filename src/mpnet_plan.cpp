@@ -371,6 +371,7 @@ namespace mpnet_local_planner{
             psk->simplifyMax(FinalPathFromStart);
             
             FinalPathFromStart.interpolate();
+            traj.cost_ = FinalPathFromStart.length();
             // std::cout << FinalPathFromStart.getStateCount() << std::endl;
             // TODO: Maybe this can be made faster?
             for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
@@ -412,6 +413,8 @@ namespace mpnet_local_planner{
             ss.simplifySolution(0.05);
             og::PathGeometric FinalPathFromStart = ss.getSolutionPath();
             FinalPathFromStart.interpolate();
+            // The path cost is left at defualt which is -1, this is because
+            // irrespective of the cost, this is the last resort for a path.
             std::cout << FinalPathFromStart.getStateCount() << std::endl;
             for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
             {
