@@ -281,22 +281,23 @@ namespace mpnet_local_planner{
                     if (!local_plan.empty())
                         pruneLocalPlan(global_pose, local_plan);
                     ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
-
-                    new_path.resetPoints();
-                    tc_->getPathRRT_star(global_pose, goal_point, new_path);
-                    // Check if we can connect the new_path and old_path
-                    if (new_path.getPointsSize()>1)
-                    {
-                        ROS_INFO("Path from RRT star");
-                        path = new_path;
-                        valid_local_path = true;
-                    }
                     else
                     {
-                        ROS_INFO("Did not find a path in the initial search");
-                        return false;        
+                        ROS_INFO("Looking for a new path");
+                        new_path.resetPoints();
+                        tc_->getPathRRT_star(global_pose, goal_point, new_path);
+                        if (new_path.getPointsSize()>1)
+                        {
+                            ROS_INFO("Path from RRT star");
+                            path = new_path;
+                            valid_local_path = true;
+                        }
+                        else
+                        {
+                            ROS_INFO("Did not find a path in the initial search");
+                            return false;        
+                        }
                     }
-                
                 }
             }
             if (valid_local_path)
