@@ -280,7 +280,7 @@ namespace mpnet_local_planner{
                     ROS_INFO("Number of points in local path: %lud", local_plan.size());
                     if (!local_plan.empty())
                         pruneLocalPlan(global_pose, local_plan);
-                    ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
+                    // ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
                     else
                     {
                         ROS_INFO("Looking for a new path");
@@ -324,6 +324,9 @@ namespace mpnet_local_planner{
         }
         plan_freq_count++;
 
+
+        if (!local_plan.empty())
+            pruneLocalPlan(global_pose, local_plan);
         // Publish information to the visualizer
         base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
         base_local_planner::publishPlan(local_plan, l_plan_pub_);
@@ -369,7 +372,7 @@ namespace mpnet_local_planner{
             const geometry_msgs::PoseStamped& w = *it;
             double distance_sq = distanceBetweenPoints(w, global_pose);
             if(distance_sq < 0.001){
-                ROS_INFO("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
+                // ROS_INFO("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
                 break;
             }
             it = plan.erase(it);
