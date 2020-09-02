@@ -1,9 +1,7 @@
 cmake_minimum_required(VERSION 2.8.3)
-# cmake_minimum_required(VERSION 3.0 FATAL_ERROR)
-# project(custom_ops)
+set(TORCH_LIB "/root/data/")
 
-
-list(APPEND CMAKE_PREFIX_PATH "/root/data/libtorch")
+list(APPEND CMAKE_PREFIX_PATH "${TORCH_LIB}libtorch")
 find_package(Torch REQUIRED)
 
 
@@ -18,6 +16,7 @@ project(mpnet_plan)
 find_package(catkin REQUIRED COMPONENTS
   costmap_2d
   base_local_planner
+  nav_core
   roscpp
   tf2
   tf2_geometry_msgs
@@ -129,14 +128,21 @@ catkin_package(
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 include_directories(
-# include
+  include
+  ${TORCH_LIB}libtorch/include
   ${catkin_INCLUDE_DIRS}
+  /usr/local/include
 )
 
 ## Declare a C++ library
-# add_library(${PROJECT_NAME}
-#   src/${PROJECT_NAME}/mpnet_plan.cpp
-# )
+add_library(${PROJECT_NAME}
+   /usr/local/lib
+   src/Controller.cpp
+   src/MPC.cpp
+   src/odometry_helper_ros.cpp
+   src/mpnet_plan_ros.cpp
+  src/mpnet_plan.cpp
+)
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
@@ -146,7 +152,8 @@ include_directories(
 ## Declare a C++ executable
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
-add_executable(${PROJECT_NAME}_node src/mpnet_plan.cpp)
+add_executable(${PROJECT_NAME}_node src/mpnet_plan.cpp src/Controller.cpp src/MPC.cpp src/odometry_helper_ros.cpp)
+add_executable(controller_node src/controller_node.cpp src/Controller.cpp src/MPC.cpp src/odometry_helper_ros.cpp)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
@@ -162,7 +169,14 @@ add_executable(${PROJECT_NAME}_node src/mpnet_plan.cpp)
 target_link_libraries(${PROJECT_NAME}_node
   ${catkin_LIBRARIES}
   ${TORCH_LIBRARIES}
+  ipopt
 )
+target_link_libraries(${PROJECT_NAME}
+  ${catkin_LIBRARIES}
+  ${TORCH_LIBRARIES}
+  ipopt
+)
+
 #target_link_libraries(${PROJECT_NAME}_node "")
 
 set_property(TARGET ${PROJECT_NAME}_node PROPERTY CXX_STANDARD 14)
@@ -170,12 +184,19 @@ if (OMPL_FOUND)
   message("Package found")
   include_directories(${OMPL_INCLUDE_DIRS})
   target_link_libraries (${PROJECT_NAME}_node ${OMPL_LIBRARIES})
+  target_link_libraries (${PROJECT_NAME} ${OMPL_LIBRARIES})
 endif (OMPL_FOUND)
 if (Boost_FOUND)
   message("Found Boost")
   include_directories(${Boost_INCLUDE_DIR})
   target_link_libraries (${PROJECT_NAME}_node ${Boost_LIBRARIES})
+  target_link_libraries (${PROJECT_NAME} ${OMPL_LIBRARIES})
 endif (Boost_FOUND)
+
+target_link_libraries(controller_node
+  ${catkin_LIBRARIES}
+  ipopt
+)
 
 #############
 ## Install ##

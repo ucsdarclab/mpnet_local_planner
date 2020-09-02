@@ -51,15 +51,19 @@
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>roscpp</build_depend>
   <build_depend>tf2</build_depend>
+  <build_depend>nav_core</build_depend>
+  <build_depend>std_srvs</build_depend>
   <build_export_depend>roscpp</build_export_depend>
   <build_export_depend>tf2</build_export_depend>
   <exec_depend>roscpp</exec_depend>
   <exec_depend>tf2</exec_depend>
+  <exec_depend>nav_core</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
 
 
   <!-- The export tag contains other, unspecified, tags -->
   <export>
     <!-- Other tools can request additional information be placed here -->
-
+    <nav_core plugin="${prefix}/mpnet_plan_plugin.xml"/>
   </export>
 </package>

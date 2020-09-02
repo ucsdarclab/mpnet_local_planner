@@ -1,0 +1,7 @@
+<library path="lib/libmpnet_plan">
+    <class name="mpnet_local_planner/MpnetLocalPlanner" type="mpnet_local_planner::MpnetLocalPlanner" base_class_type="nav_core::BaseLocalPlanner">
+    <description>
+      A implementation of a local planner using motion planning networks.
+    </description>
+  </class>
+</library>

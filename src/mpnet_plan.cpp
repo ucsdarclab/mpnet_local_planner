@@ -1,103 +1,449 @@
-#include <torch/script.h> // One-stop header.
 #include <csignal>
 #include <typeinfo>
 #include <iostream>
 #include <memory>
 #include <math.h>
 #include <ros/ros.h>
-#include <base_local_planner/world_model.h>
+
 #include <base_local_planner/costmap_model.h>
-
-#include <ompl/base/spaces/DubinsStateSpace.h>
-#include <ompl/base/ScopedState.h>
-#include <ompl/geometric/SimpleSetup.h>
-
-#include <tf2_ros/transform_listener.h>
-#include <tf2_ros/buffer.h>
-#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
-
-
-#include <costmap_2d/costmap_2d_ros.h>
-#include <costmap_2d/costmap_2d.h>
+#include <base_local_planner/goal_functions.h>
 
 #include <nav_msgs/OccupancyGrid.h>
 #include <nav_msgs/Path.h>
 
-namespace ob = ompl::base;
+#include <mpnet_plan.h>
+#include <tf2/utils.h>
+
+#include <Controller.h>
+#include <odometry_helper_ros.h>
+
+#include <angles/angles.h>
+
+#include <ompl/geometric/SimpleSetup.h>
 namespace og = ompl::geometric;
 
-
-
-torch::Tensor copy_costmap(double x, double y, double resolution, double origin_x, double origin_y,costmap_2d::Costmap2D* costmap)
-{
-    torch::Tensor costmap_egocentric = torch::full({1,1,80,80}, 1);
-
-    // FOR COSTMAP GENERATION and COLLISION CHECKER
-    char* cost_translation_table = new char[256];
-
-    // special values:
-    cost_translation_table[0] = 0;  // NO obstacle
-    cost_translation_table[253] = 99;  // INSCRIBED obstacle
-    cost_translation_table[254] = 100;  // LETHAL obstacle
-    cost_translation_table[255] = -1;  // UNKNOWN
-
-    // regular cost values scale the range 1 to 252 (inclusive) to fit
-    // into 1 to 98 (inclusive).
-    for (int i = 1; i < 253; i++)
+namespace mpnet_local_planner{
+    
+    char* MpnetPlanner::cost_translation_table=NULL;
+    
+    // MpnetPlanner::MpnetPlanner(){}
+    
+    MpnetPlanner::MpnetPlanner(
+        tf2_ros::Buffer* tf, 
+        costmap_2d::Costmap2DROS *costmap_ros, 
+        const std::string& file_name,
+        double xy_tolerance,
+        double yaw_tolerance,
+        int numSamples,
+        int numPaths,
+        std::vector<geometry_msgs::Point> footprint):
+    tf_(NULL),
+    navigation_costmap_ros(NULL),
+    collision_costmap_ros(NULL),
+    costmap_collision_(NULL),
+    costmap_(NULL),
+    world_model(NULL),
+    space(std::make_shared<ob::DubinsStateSpace>(0.58)),
+    bounds(NULL),
+    si(NULL),
+    initialized_(false),
+    g_tolerance(xy_tolerance),
+    yaw_tolerance(yaw_tolerance),
+    planAlgo(NULL),
+    device(torch::kCPU),
+    use_gpu(true),
+    num_samples(numSamples),
+    num_paths(numPaths),
+    robot_footprint(footprint)
     {
-        cost_translation_table[ i ] = char(1 + (97 * (i - 1)) / 251);
+        if (~isInitialized())
+        {
+            if (cost_translation_table==NULL)
+            {
+                cost_translation_table = new char[256];
+                // special values:
+                cost_translation_table[0] = 0;  // NO obstacle
+                cost_translation_table[253] = 99;  // INSCRIBED obstacle
+                cost_translation_table[254] = 100;  // LETHAL obstacle
+                cost_translation_table[255] = -1;  // UNKNOWN
+
+                // regular cost values scale the range 1 to 252 (inclusive) to fit
+                // into 1 to 98 (inclusive).
+                for (int i = 1; i < 253; i++)
+                {
+                    cost_translation_table[ i ] = char(1 + (97 * (i - 1)) / 251);
+                }
+            }
+
+            // Create a connection to the global costmap
+            // THIS IS A HACK FOR COLLISION CHECKING FOR TIME BEING
+            // THE CORRECT SOLUTION WOULD BE TO USE THE LOCAL COSTMAP 
+            // AND CHECK IF THE PATH GOES OUTSIDE THE BOUNDS OF THE LOCAL COSTMAP
+            tf_ = tf;
+            collision_costmap_ros = new costmap_2d::Costmap2DROS("collision_costmap", *tf_);
+            collision_costmap_ros->pause();
+            costmap_collision_ = collision_costmap_ros->getCostmap();
+            world_model = new base_local_planner::CostmapModel(*costmap_collision_);
+            collision_costmap_ros->start();
+
+            // Create a connection to the local costmap
+            navigation_costmap_ros = costmap_ros;
+            costmap_ = navigation_costmap_ros->getCostmap();
+
+            // TODO: Set map bounds dynamically 
+            bounds = new ob::RealVectorBounds(2);
+            // bounds->setLow(0,0.0);
+            // bounds->setLow(1,0.0);
+            // bounds->setHigh(0,27.0);
+            // bounds->setHigh(1,27.0);
+            
+            // bounds->setLow(0,0.0);
+            // bounds->setLow(1,0.0);
+            // bounds->setHigh(0,13.5);
+            // bounds->setHigh(1,14.0);
+
+            bounds->setLow(0,-100);
+            bounds->setLow(1,-100);
+            bounds->setHigh(0,100);
+            bounds->setHigh(1,100);
+            
+            bounds->setLow(2,-M_PI);
+            bounds->setHigh(2,M_PI);
+            space->as<ob::SE2StateSpace>()->setBounds(*bounds);
+            space->setLongestValidSegmentFraction(0.0005);
+            si = std::make_shared<ob::SpaceInformation>(space);
+            si->setStateValidityChecker([this](const ob::State *state) -> bool
+            {
+                return this->isStateValid(state);
+            }
+            );
+            psk = std::make_shared<og::PathSimplifier>(si);
+
+            planAlgo = std::make_shared<og::RRTstar>(si);
+            planAlgo->setRange(0.2);
+            planAlgo->setTreePruning(true);
+
+            module = torch::jit::load(file_name);
+            if (!torch::cuda::is_available())
+            {
+                use_gpu = false;
+                ROS_INFO("Did not find CUDA, setting device to CPU");
+            }
+
+            if (!use_gpu)
+            {
+                module.to(torch::kCPU);
+            }
+            else
+            {
+                device = torch::Device(torch::kCUDA);
+                ROS_INFO("Using GPU");
+            }
+            
+            // For debugging reasons
+            ros::NodeHandle n;
+            target_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/targetpose", 1);
+            initialized_ = true;
+
+        }
+        else
+        {
+            ROS_WARN("The core planner has already been initialized, doing nothing");
+        }
     }
 
-    int64_t mx = (int64_t)((x-origin_x)/resolution);
-    int64_t my = (int64_t)((y-origin_y)/resolution);
-    int64_t start_x = 120-mx;
-    int64_t start_y = 120-my;
+    MpnetPlanner::~MpnetPlanner()
+    {
+        if (navigation_costmap_ros!=NULL)
+            delete navigation_costmap_ros;
 
-    int64_t skip_x = 0 ? start_x%3==0 : 3-start_x%3;
-    int64_t skip_y = 0 ? start_y%3==0 : 3-start_y%3;
-    
-    int64_t start_shrunk_x = (start_x + skip_x)/3;
-    int64_t start_shrunk_y = (start_y + skip_y)/3;
-    auto cm_a = costmap_egocentric.accessor<float,4>();
-    unsigned char* data = costmap->getCharMap();
-    if (data != NULL)
-    {    
-        // Copy costmap data into egocentric costmap
-        for (int64_t i=0, r=skip_y; r < 120; i++, r+=3)
-        {
-            for (int64_t j=0, c=skip_x; c<120; j++, c+=3)
+        if (bounds!=NULL)
+            delete bounds;
+
+        if (collision_costmap_ros!=NULL)
+            delete collision_costmap_ros;
+
+        if (world_model!=NULL)
+            delete world_model;
+    }
+
+
+    torch::Tensor MpnetPlanner::copy_costmap(double x, double y)
+    {
+        torch::Tensor costmap_egocentric = torch::full({1,1,80,80}, 1);
+
+        double resolution = costmap_->getResolution();
+        double origin_x, origin_y;
+        costmap_->mapToWorld(0,0,origin_x,origin_y);
+        origin_x = origin_x - resolution/2;
+        origin_y = origin_y - resolution/2;
+
+        // FOR COSTMAP GENERATION
+        int64_t mx = (int64_t)((x-origin_x)/resolution);
+        int64_t my = (int64_t)((y-origin_y)/resolution);
+        int64_t start_x = 120-mx;
+        int64_t start_y = 120-my;
+
+        int64_t skip_x = 0 ? start_x%3==0 : 3-start_x%3;
+        int64_t skip_y = 0 ? start_y%3==0 : 3-start_y%3;
+        
+        int64_t start_shrunk_x = (start_x + skip_x)/3;
+        int64_t start_shrunk_y = (start_y + skip_y)/3;
+        auto cm_a = costmap_egocentric.accessor<float,4>();
+        unsigned char* data = costmap_->getCharMap();
+        if (data != NULL)
+        {    
+            // Copy costmap data into egocentric costmap
+            for (int64_t i=0, r=skip_y; r < 120; i++, r+=3)
             {
-                // std::cout<< start_shrunk_y+i << " "<< start_shrunk_x + j << std::endl;
-                cm_a[0][0][start_shrunk_y+i][start_shrunk_x +j] = ((float)cost_translation_table[data[c+r*120]])/100;
+                for (int64_t j=0, c=skip_x; c<120; j++, c+=3)
+                {
+                    // std::cout<< start_shrunk_y+i << " "<< start_shrunk_x + j << std::endl;
+                    cm_a[0][0][start_shrunk_y+i][start_shrunk_x +j] = ((float)cost_translation_table[data[c+r*120]])/100;
+                }
+            }
+        }
+        return costmap_egocentric;
+    }
+
+    torch::Tensor MpnetPlanner::copy_pose(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds)
+    {
+        torch::Tensor input_vector = torch::empty({1,6});
+        
+        auto iv_a = input_vector.accessor<float,2>();
+        double resolution = costmap_->getResolution();
+        double origin_x, origin_y;
+        costmap_->mapToWorld(0,0,origin_x,origin_y);
+        origin_x = origin_x - resolution/2;
+        origin_y = origin_y - resolution/2;
+        
+        input_vector[0][0] = ((start[0]-origin_x)/bounds[0])*2 - 1;
+        input_vector[0][1] = ((start[1]-origin_y)/bounds[1])*2 - 1;
+        input_vector[0][2] = start[2]/bounds[2];
+        input_vector[0][3] = ((goal[0]-origin_x)/bounds[0])*2 - 1 ;
+        input_vector[0][4] = ((goal[1]-origin_y)/bounds[1])*2 - 1 ;
+        input_vector[0][5] = goal[2]/bounds[2];
+
+        return input_vector;
+    }
+
+    std::vector<double> MpnetPlanner::getMapPoint(torch::Tensor target_state, std::vector<double> bounds)
+    {
+        auto tensor_a = target_state.accessor<float,2>();
+        
+        double resolution = costmap_->getResolution();
+        double origin_x, origin_y;
+        costmap_->mapToWorld(0,0,origin_x,origin_y);
+        origin_x = origin_x - resolution/2;
+        origin_y = origin_y - resolution/2;
+
+        std::vector<double> pose{(tensor_a[0][0]+1)*bounds[0]/2 + origin_x, (tensor_a[0][1]+1)*bounds[1]/2 + origin_y,tensor_a[0][2]*bounds[2]};
+        return pose;
+    }
+
+    std::vector<double> MpnetPlanner::getTargetPoint(const ob::ScopedState<>&start, const ob::ScopedState<> &goal, std::vector<double> bounds)
+    {
+        torch::NoGradGuard no_grad;
+        torch::Tensor input_vector = copy_pose(start, goal, bounds);
+        inputs.push_back(input_vector.to(device));
+        // torch::Tensor costmap = torch::full({1,1,80,80}, 1);
+        // auto start_time = std::chrono::high_resolution_clock::now();
+        torch::Tensor costmap = copy_costmap(start[0], start[1]);
+        // copy_costmap(start[0], start[1], costmap);
+        // auto stop_time = std::chrono::high_resolution_clock::now();
+        // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+        // ROS_INFO("Time taken to copy : %ld microseconds", duration.count());
+        inputs.push_back(costmap.to(device));
+
+        at::Tensor output = module.forward(inputs).toTensor();
+        if (use_gpu)
+            output = output.to(torch::kCPU);
+
+        std::vector<double> targetPoint = getMapPoint(output, bounds);
+        inputs.clear();
+        return targetPoint;
+    }
+
+
+    bool MpnetPlanner::isStateValid(const ob::State *state)
+    {
+        const auto *s = state->as<ob::SE2StateSpace::StateType>();
+        std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
+        // Pass the orientation of the robot
+        double footprint_cost  = world_model->footprintCost(s->getX(), s->getY(),s->getYaw(), footprint);
+        return (footprint_cost>=0);
+    }
+
+    bool MpnetPlanner::isStateValid(geometry_msgs::PoseStamped start)
+    {
+        double yaw = tf2::getYaw(start.pose.orientation);
+        double footprint_cost = world_model->footprintCost(start.pose.position.x, start.pose.position.y, yaw, robot_footprint);
+        return (footprint_cost>=0);
+    }
+
+    // base_local_planner::Trajectory MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds)
+    // void MpnetPlanner::getPath(ob::ScopedState<> start,ob::ScopedState<> goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
+    void MpnetPlanner::getPath(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, std::vector<double> bounds, base_local_planner::Trajectory &traj)
+    {
+
+        // Convert poseStamped to Scoped state
+        ob::ScopedState<> start_ompl(space), goal_ompl(space);
+        start_ompl[0] = start.pose.position.x; 
+        start_ompl[1] = start.pose.position.y;
+        start_ompl[2] = tf2::getYaw(start.pose.orientation);
+        /*     
+        if (isStateValid(start_ompl()))
+        {
+            std::cout << "Valid start state \n";
+        } */
+        goal_ompl[0] = goal.pose.position.x ;
+        goal_ompl[1] = goal.pose.position.y ;
+        goal_ompl[2] = tf2::getYaw(goal.pose.orientation);
+
+        og::PathGeometric FinalPathFromStart(si, start_ompl());
+        ob::ScopedState<> target_pose(space), s(space);
+        bool isStartValid, isGoalValid;
+        std::vector<double> targetPose;
+        // base_local_planner::Trajectory traj(0.0,0.0,0.0,0.0, (unsigned int)10000); 
+        geometry_msgs::PoseWithCovarianceStamped nextPose;
+        nextPose.header.frame_id = "/map";
+        ros::Rate rate(10.0);
+        traj.resetPoints();
+        ob::ScopedState<> reset_ompl(space, start_ompl());
+        double xy_distance_from_goal, yaw_from_goal;
+        for(int numPlan=0; numPlan<num_paths; numPlan++)
+        {
+            start_ompl=reset_ompl;
+            FinalPathFromStart.clear();
+            FinalPathFromStart.append(start_ompl());
+            for(int sample=0;sample<num_samples;sample++)
+            {
+                og::PathGeometric pathToGoal = og::PathGeometric(si, start_ompl(), goal_ompl());
+                isGoalValid = pathToGoal.check();
+                if (isGoalValid)
+                {
+                    ROS_INFO("Valid path found");
+                    FinalPathFromStart.append(goal_ompl());
+                    break;
+                }
+                targetPose = getTargetPoint(start_ompl, goal_ompl, bounds);
+                target_pose[0] = targetPose[0];
+                target_pose[1] = targetPose[1];
+                target_pose[2] = targetPose[2];
+
+                og::PathGeometric pathFromStart=og::PathGeometric(si, start_ompl(), target_pose());
+                isStartValid = pathFromStart.check();
+                
+                if (isStartValid)
+                {
+                    // std::cout<< "Valid sample point to start" << std::endl;
+                    FinalPathFromStart.append(target_pose());
+                    start_ompl = target_pose;
+                }
+
+                xy_distance_from_goal = std::hypot(targetPose[0]-goal_ompl[0], targetPose[1]-goal_ompl[1]);
+                yaw_from_goal = fabs(angles::shortest_angular_distance(targetPose[2], goal_ompl[2]));
+                if (xy_distance_from_goal <=g_tolerance && yaw_from_goal<=yaw_tolerance && isStartValid)
+                // if (xy_distance_from_goal <=g_tolerance)
+                {
+                    ROS_INFO("Valid path close to goal found");
+                    ROS_INFO("The goal tolerance is set at : %f", g_tolerance);
+                    isGoalValid=true;
+                    break;
+                }
+            }
+            if (isGoalValid)
+                break;
+        }
+        if (isGoalValid)
+        {
+            // // Only for debugging purposes
+            nextPose.pose.pose.position.x =  goal_ompl[0];
+            nextPose.pose.pose.position.y = goal_ompl[1];
+            nextPose.pose.pose.position.z = 0;
+
+            nextPose.pose.pose.orientation.z = sin(goal_ompl[2]/2);
+            nextPose.pose.pose.orientation.w = cos(goal_ompl[2]/2);
+            target_robot_pub.publish(nextPose);
+
+            // Simplify solution
+            std::size_t numStates = FinalPathFromStart.getStateCount();
+            psk->simplifyMax(FinalPathFromStart);
+            // TODO : Check this interpolate function on the number of points it takes to generate a 
+            // feasilble path.
+            FinalPathFromStart.interpolate();
+            traj.cost_ = FinalPathFromStart.length();
+            // std::cout << FinalPathFromStart.getStateCount() << std::endl;
+            // TODO: Maybe this can be made faster?
+            for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
+            {
+                s = FinalPathFromStart.getState(i);
+                traj.addPoint(s[0], s[1], s[2]);
             }
         }
     }
-    return costmap_egocentric;
+
+    void MpnetPlanner::getPathRRT_star(geometry_msgs::PoseStamped start, geometry_msgs::PoseStamped goal, base_local_planner::Trajectory &traj)
+    {
+        og::SimpleSetup ss(si);
+        /* 
+        ss.setStateValidityChecker([this](const ob::State *state) -> bool
+        {
+            return this->isStateValid(state);
+        });
+ */
+        ob::ScopedState<> start_ompl(space), goal_ompl(space), s(space);
+        start_ompl[0] = start.pose.position.x; 
+        start_ompl[1] = start.pose.position.y;
+        start_ompl[2] = tf2::getYaw(start.pose.orientation);
+
+        goal_ompl[0] = goal.pose.position.x ;
+        goal_ompl[1] = goal.pose.position.y ;
+        goal_ompl[2] = tf2::getYaw(goal.pose.orientation);
+
+        planAlgo->clear();
+        ss.setStartAndGoalStates(start_ompl, goal_ompl);
+        ss.setPlanner(planAlgo);
+        // std::cout << "The range of the planner : " << planAlgo->getRange();
+
+        ob::PlannerStatus solved = ss.solve(0.02);
+        traj.resetPoints();
+
+        if (ss.haveSolutionPath())
+        {
+            ss.simplifySolution(0.05);
+            og::PathGeometric FinalPathFromStart = ss.getSolutionPath();
+            FinalPathFromStart.interpolate();
+            // The path cost is left at defualt which is -1, this is because
+            // irrespective of the cost, this is the last resort for a path.
+            std::cout << FinalPathFromStart.getStateCount() << std::endl;
+            for(unsigned int i=0; i<FinalPathFromStart.getStateCount(); i++)
+            {
+                s = FinalPathFromStart.getState(i);
+                traj.addPoint(s[0], s[1], s[2]);
+            }
+        }
+
+    }
 }
 
-
-torch::Tensor copy_pose(const ob::ScopedState<> &start, const ob::ScopedState<> &goal, std::vector<double> bounds, double origin_x, double origin_y)
+class GetGlobalPath
 {
-    torch::Tensor input_vector = torch::empty({1,6});
-    
-    auto iv_a = input_vector.accessor<float,2>();
-    
-    input_vector[0][0] = ((start[0]-origin_x)/bounds[0])*2 - 1;
-    input_vector[0][1] = ((start[1]-origin_y)/bounds[1])*2 - 1;
-    input_vector[0][2] = start[2]/bounds[2];
-    input_vector[0][3] = ((goal[0]-origin_x)/bounds[0])*2 - 1 ;
-    input_vector[0][4] = ((goal[1]-origin_y)/bounds[1])*2 - 1 ;
-    input_vector[0][5] = goal[2]/bounds[2];
+    nav_msgs::Path global_path;
+    public:
+    GetGlobalPath(){}
+    ~GetGlobalPath(){}
 
-    return input_vector;
-}
+    void globalPlanCallback(const nav_msgs::Path &msg)
+    {
+        global_path = msg;
+    }
 
-std::vector<double> getMapPoint(torch::Tensor target_state, std::vector<double> bounds, double origin_x, double origin_y)
-{
-    auto tensor_a = target_state.accessor<float,2>();
-    std::vector<double> pose{(tensor_a[0][0]+1)*bounds[0]/2 + origin_x, (tensor_a[0][1]+1)*bounds[1]/2 + origin_y,tensor_a[0][2]*bounds[2]};
-    return pose;
-}
+    nav_msgs::Path getPath()
+    {
+        return global_path;
+    }
+};
 
 int main(int argc,char* argv[]) {
 
@@ -105,10 +451,30 @@ int main(int argc,char* argv[]) {
     tf2_ros::Buffer buffer(ros::Duration(10.0));
     tf2_ros::TransformListener tf(buffer);
 
-    ros::NodeHandle n;
-
+    ros::NodeHandle n("/mpnet_local_planner/MpnetLocalPlanner");
     nav_msgs::OccupancyGrid grid;
 
+    costmap_2d::Costmap2DROS *navigation_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap",  buffer);
+    navigation_costmap_ros->pause();
+    costmap_2d::Costmap2D *costmap_ = navigation_costmap_ros->getCostmap();
+
+    // Get file name
+    std::string filename;
+    if (n.getParam("model_file", filename))
+    {
+        // Goal tolerance parameter
+        double g_tolerance, yaw_tolerance;    
+        n.param("xy_goal_tolerance", g_tolerance, 0.1);
+        n.param("yaw_goal_tolerance", yaw_tolerance, 0.2);
+
+        // Planning parameters
+        int numSamples, numPaths;
+        n.param("num_samples", numSamples, 4);
+        n.param("num_paths", numPaths, 2);
+        std::vector<geometry_msgs::Point> footprint;
+        mpnet_local_planner::MpnetPlanner plan(&buffer, navigation_costmap_ros, filename, g_tolerance, yaw_tolerance, numSamples, numPaths, footprint);
+     
+    navigation_costmap_ros->start();
     // -- FOR TESTING PURPOSES - setting start and goal location --
 
     ros::Publisher move_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/initialpose", 1);
@@ -116,238 +482,152 @@ int main(int argc,char* argv[]) {
     ros::Publisher goal_robot_pub = n.advertise<geometry_msgs::PoseWithCovarianceStamped>("/goalpose", 1);
 
     ros::Publisher display_trajectory_pub = n.advertise<nav_msgs::Path>("/mpnet_path",1);
+    ros::Publisher controller_pub = n.advertise<geometry_msgs::Twist>("/mpc_cmd_vel",10);
+    // ros::Publisher controller_pub = n.advertise<ackermann_msgs::AckermannDriveStamped>("/drive", 10);
     nav_msgs::Path gui_path;
+
+    std::string global_frame_ = navigation_costmap_ros->getGlobalFrameID();
+
+    mpnet_local_planner::Controller controller;
+    mpnet_local_planner::OdometryHelperRos odom_helper_;
+    odom_helper_.setOdomTopic( "/odom" );
+
     // Waiting for rviz to connect. This prevents data lose
     while (0 == move_robot_pub.getNumSubscribers()) 
     {
           ROS_INFO("Waiting for subscribers to connect");
           ros::Duration(0.1).sleep();
     }
-    geometry_msgs::PoseWithCovarianceStamped rrt_point, goal_pose;
-    rrt_point.header.frame_id = "/map";
-
-    ob::StateSpacePtr space(std::make_shared<ob::DubinsStateSpace>(0.58));
-    ob::RealVectorBounds bounds(2);
-    bounds.setLow(0,0.0);
-    bounds.setLow(1,0.0);
-    bounds.setHigh(0, 27.0);
-    bounds.setHigh(1, 27.0);
-
-    bounds.setLow(2, -3.14);
-    bounds.setHigh(2, 3.14);
-    space->as<ob::SE2StateSpace>()->setBounds(bounds);
-    space->setLongestValidSegmentFraction(0.0005);
-    // ob::SpaceInformation si(space);
-    auto si(std::make_shared<ob::SpaceInformation>(space));
-    ob::ScopedState<> mpnet_start(space), mpnet_goal(space), current_pose(space), target_pose(space), state(space), s(space);
-    og::PathGeometric path(si);
-
-    // Start point
-    mpnet_start[0] = 1.39847;
-    mpnet_start[1] = 3.31964;
-    mpnet_start[2] = 1.65756; 
-
-    rrt_point.pose.pose.position.x = mpnet_start[0];
-    rrt_point.pose.pose.position.y = mpnet_start[1];
-    rrt_point.pose.pose.position.z = 0.;
-
-    rrt_point.pose.pose.orientation.x = 0. ;
-    rrt_point.pose.pose.orientation.y = 0.;
-    rrt_point.pose.pose.orientation.z = sin(mpnet_start[2]/2);
-    rrt_point.pose.pose.orientation.w = cos(mpnet_start[2]/2);
-    
-    mpnet_goal[0] = 2.7811;
-    mpnet_goal[1] = 5.4415; 
-    mpnet_goal[2] = 0.02; 
-
-    goal_pose.header.frame_id = "/map";
-    goal_pose.pose.pose.position.x = mpnet_goal[0];
-    goal_pose.pose.pose.position.y = mpnet_goal[1];
-    goal_pose.pose.pose.position.z = 0.;
-
-    goal_pose.pose.pose.orientation.x = 0. ;
-    goal_pose.pose.pose.orientation.y = 0.;
-    goal_pose.pose.pose.orientation.z = sin(mpnet_goal[2]/2);
-    goal_pose.pose.pose.orientation.w = cos(mpnet_goal[2]/2);
-
-    move_robot_pub.publish(rrt_point);
-    goal_robot_pub.publish(goal_pose);
+    GetGlobalPath global_plan_obj;
+    ros::Subscriber global_plan_sub = n.subscribe("/move_base/TrajectoryPlannerROS/global_plan", 1 , &GetGlobalPath::globalPlanCallback, &global_plan_obj);
+    ros::Duration(1).sleep();
     ros::spinOnce();
 
-    // ^^ FOR TESTING PURPOSES ^^
-    costmap_2d::Costmap2DROS* planner_costmap_ros = new costmap_2d::Costmap2DROS("local_costmap", buffer);
-    planner_costmap_ros -> pause();
-    costmap_2d::Costmap2D* costmap_ = planner_costmap_ros->getCostmap();
-    planner_costmap_ros -> start();
-
-    // Get the global costmap for collision checking -- THIS IS A HACK FOR COLLISION CHECKING FOR TIME BEING
-    // THE CORRECT SOLUTION WOULD BE TO USE THE LOCAL COSTMAP AND CHECK IF THE PATH GOES OUTSIDE THE BOUNDS
-    costmap_2d::Costmap2DROS* collision_costmap_ros = new costmap_2d::Costmap2DROS("global_costmap", buffer);
-    collision_costmap_ros -> pause();
-    costmap_2d::Costmap2D* costmap_collision = collision_costmap_ros->getCostmap();
-    base_local_planner::WorldModel* world_model = new base_local_planner::CostmapModel(*costmap_collision);
-    collision_costmap_ros -> start();
-
-    ros::Duration(10.0).sleep();
-    ros::Rate rate(200.0);
-
-    si->setStateValidityChecker([&](const ob::State *state) -> bool
-        {
-            const auto *s = state->as<ob::SE2StateSpace::StateType>();
-            std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
-            // Pass the orientation of the robot
-            double footprint_cost  = world_model->footprintCost(s->getX(), s->getY(),s->getYaw(), footprint);
-            return (footprint_cost>=0);
-        });
-
-    // Define the bound for space
-    std::vector<double> spaceBound{6.0, 6.0, M_PI};
-
-    // CHECKING FOR COLLISION
-    std::vector<geometry_msgs::Point> footprint = collision_costmap_ros->getRobotFootprint();
-    // Pass the orientation of the robot
-    double footprint_cost  = world_model->footprintCost(mpnet_start[0], mpnet_start[1], mpnet_start[2], footprint);
-    bool validState =  (footprint_cost>=0);
-    if (validState)
-        std::cout << "Feasible Starting position" << std::endl;
-    // ^^ END COLLISION CHECKING
-
-    torch::Device device(torch::kCUDA);
-
-    // torch::jit::script::Module module = torch::jit::load(argv[1]);
-    torch::jit::script::Module module = torch::jit::load("/root/data/model_1_localcostmap/mpnet_model_299.pt");
-    module.to(torch::kCPU);
-    std::cout << "ok\n";
-    // Create a vector of inputs for current/goal states
-    std::vector<torch::jit::IValue> inputs;
-    std::vector<double> targetPose;
-
-    geometry_msgs::PoseWithCovarianceStamped targetPoint;
-    // while (n.ok())
-    og::PathGeometric FinalPathToGoal(si, mpnet_goal());
-    og::PathGeometric FinalPathFromStart(si, mpnet_start());
-    bool isStartValid, isGoalValid, isStartGoalValid;
-    for(int sample=0;sample<100;sample++)
+    std::vector<geometry_msgs::PoseStamped> global_plan_;
+    nav_msgs::Path global_path = global_plan_obj.getPath();
+    global_plan_.clear();
+    for(unsigned int k=0;k<global_path.poses.size(); k++)
     {
-        // std::cout << sample << std::endl;
-        torch::NoGradGuard no_grad;        
-        
-        // Get the current costmap
-        double resolution = costmap_->getResolution();
-        grid.header.frame_id = "map";
-        grid.header.stamp = ros::Time::now();
-        grid.info.resolution = resolution;
-        grid.info.width = costmap_->getSizeInCellsX();
-        grid.info.height = costmap_->getSizeInCellsY();
+        global_plan_.push_back(global_path.poses[k]);
+    }
+    // global_plan_ = global_plan_obj.getPath();
+    std::cout << "Path header: " << global_plan_[0].header.frame_id << std::endl; 
+    if (global_plan_.empty())
+    {
+        ROS_WARN("Could not get the global path");
+    }
+    else
+    {    
+        geometry_msgs::PoseStamped global_pose;
+        if (!navigation_costmap_ros->getRobotPose(global_pose))
+        {
+            std::cout << "Didn't get robot pose \n";
+        }
+        std::cout << "Robot frame: " << global_pose.header.frame_id << std::endl;
+        std::vector<geometry_msgs::PoseStamped> transformed_plan;
+        if(!base_local_planner::transformGlobalPlan(buffer, global_plan_, global_pose, *costmap_, global_frame_, transformed_plan))
+        {
+            ROS_WARN("Could not transform the global plan to the frame of the controller");
+        }
 
-        double wx, wy;
-        costmap_->mapToWorld(0, 0, wx, wy);
+        base_local_planner::prunePlan(global_pose, transformed_plan, global_plan_);
 
-        grid.info.origin.position.x = wx - resolution / 2;
-        grid.info.origin.position.y = wy - resolution / 2;
-        grid.info.origin.position.z = 0.0;
-        grid.info.origin.orientation.w = 1.0;
-        
+        if (transformed_plan.empty())
+        {
+            ROS_ERROR("No path found in the current frame");
+        }
 
-        grid.data.resize(grid.info.width * grid.info.height);
-        
-        // inputs.push_back(torch::ones({1,1,80,80}));
-        torch::Tensor input_vector = copy_pose(mpnet_start, mpnet_goal, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
-        inputs.push_back(input_vector);
+        geometry_msgs::PoseStamped goal_point = transformed_plan.back();
+        geometry_msgs::PoseStamped goal_point_minus = transformed_plan.end()[-2];
 
-        torch::Tensor costmap= copy_costmap(mpnet_start[0], mpnet_start[1], resolution, grid.info.origin.position.x, grid.info.origin.position.y, costmap_);
-        inputs.push_back(costmap);
+        // Calculate the distance of the vector
+        double diff_x = goal_point.pose.position.x - goal_point_minus.pose.position.x;
+        double diff_y = goal_point.pose.position.y - goal_point_minus.pose.position.y;
 
-        // Execute the model and turn its output into a tensor.
-        at::Tensor output = module.forward(inputs).toTensor();
-        // std::cout << output.slice(/*dim=*/1, /*start=*/0, /*end=*/3) << '\n';
-        targetPose = getMapPoint(output, spaceBound, grid.info.origin.position.x, grid.info.origin.position.y);
-        // Display the point on the map
-        targetPoint.header.frame_id = "/map";
-        targetPoint.pose.pose.position.x = targetPose[0];
-        targetPoint.pose.pose.position.y = targetPose[1];
-        targetPoint.pose.pose.position.z = 0.;
+        double vec_len = sqrt(diff_x*diff_x + diff_y *diff_y);
+        double angle = atan2(diff_y, diff_x);
+        goal_point.pose.orientation.z = sin(angle/2);
+        goal_point.pose.orientation.w = cos(angle/2);
 
-        targetPoint.pose.pose.orientation.x = 0. ;
-        targetPoint.pose.pose.orientation.y = 0.;
-        targetPoint.pose.pose.orientation.z = sin(targetPose[2]/2);
-        targetPoint.pose.pose.orientation.w = cos(targetPose[2]/2);
-        
-        target_robot_pub.publish(targetPoint);
+        geometry_msgs::PoseWithCovarianceStamped rrt_point, goal_pose;
+        // Starting point
+        rrt_point.header.frame_id = "/map";
+        rrt_point.pose.pose = global_pose.pose;
+
+        // Goal point 
+        goal_pose.header.frame_id = "/map";
+        goal_pose.pose.pose = goal_point.pose;
+
         goal_robot_pub.publish(goal_pose);
         ros::spinOnce();
-        // TODO: Check if the node can be reached
-        target_pose[0] = targetPose[0];
-        target_pose[1] = targetPose[1];
-        target_pose[2] = targetPose[2];
 
-        // TODO: Add point to path
+        // ^^ FOR TESTING PURPOSES ^^
+        ros::Duration(2.0).sleep();
+        ros::Rate rate(200.0);
 
-        og::PathGeometric pathFromStart=og::PathGeometric(si, mpnet_start(), target_pose());
-        isStartValid = pathFromStart.check();
+        // Define the bound for space
+        std::vector<double> spaceBound{6.0, 6.0, M_PI};
+
+        torch::Device device(torch::kCUDA);
+
+        // Create a vector of inputs for current/goal states
+        geometry_msgs::PoseWithCovarianceStamped targetPoint;
+        base_local_planner::Trajectory path;
+        // auto start_time = std::chrono::high_resolution_clock::now();
+        plan.getPath(global_pose, goal_point, spaceBound, path);
+        // auto stop_time = std::chrono::high_resolution_clock::now();
+        // auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
+        // ROS_INFO("Time taken to plan : %ld microseconds", duration.count());
+
+        // Publish the message
+        gui_path.header.frame_id = "/map";
+        gui_path.poses.resize(path.getPointsSize());
+        for(unsigned int i =0; i<path.getPointsSize(); i++)
+        {
+            geometry_msgs::PoseStamped point;
+            double wx, wy, theta;
+            path.getPoint(i, wx, wy, theta);
+            point.pose.position.x = wx;
+            point.pose.position.y = wy;
+
+            point.pose.orientation.x = 0.0;
+            point.pose.orientation.y = 0.0;
+            point.pose.orientation.z = sin(theta/2);
+            point.pose.orientation.w = cos(theta/2);
+
+            gui_path.poses[i] = point;
+        }
+        geometry_msgs::PoseStamped robot_vel;
+        nav_msgs::Odometry base_odom;
+       
+        ros::spinOnce();
+
+        while(n.ok()){
+            display_trajectory_pub.publish(gui_path);
+
+            // std::cout<<"in the loop"<<std::endl;
+            // ackermann_msgs::AckermannDriveStamped msg = ackermann_msgs::AckermannDriveStamped();
+            // msg.header.frame_id = "base_link";
+            // msg.header.stamp = ros::Time::now();
+
+            // geometry_msgs::Twist msg;            
+            // odom_helper_.getRobotVel(robot_vel);
+            // odom_helper_.getOdom(base_odom);
+            // controller.observe(robot_vel, base_odom);
+            // controller.get_path(path);
+            // controller.control_cmd_vel(msg);
+            // controller_pub.publish(msg);
+            ros::spinOnce();
+        }   
         
-        if (isStartValid)
-        {
-            std::cout<< "Valid sample point to start" << std::endl;
-            FinalPathFromStart.append(target_pose());
-            mpnet_start = target_pose;
-        }
-
-        og::PathGeometric pathToGoal = og::PathGeometric(si, mpnet_start(), mpnet_goal());
-        isGoalValid = pathToGoal.check();
-        if (isGoalValid)
-        {
-            std::cout<< "Valid path found" << std::endl;
-            break;
-        }
-
-        /* 
-        if (~isStartValid && isGoalValid)
-        {
-            std::cout << "Valid sample point to goal" << std::endl;
-            FinalPathToGoal.prepend(target_pose());
-            mpnet_goal = target_pose;
-        }
-        */
         rate.sleep();
-        inputs.clear();
+        // if (navigation_costmap_ros!=NULL)
+        //     delete navigation_costmap_ros;
+            }
     }
-    if (isStartValid && isGoalValid)
-    {
-        FinalPathFromStart.append(FinalPathToGoal);
+else
+{
+        ROS_ERROR("Did not find model file");
+                }
+
     }
-    path = FinalPathFromStart;
-    // TODO: Check if goal is reached
-    gui_path.header.frame_id = "/map";
-    path.interpolate();
-    gui_path.poses.resize(path.getStateCount());
-    for(unsigned int i =0; i<path.getStateCount(); i++)
-    {
-        s = path.getState(i);
-        geometry_msgs::PoseStamped point;
-        point.pose.position.x = s[0];
-        point.pose.position.y = s[1];
-
-        point.pose.orientation.x = 0.0;
-        point.pose.orientation.y = 0.0;
-        point.pose.orientation.z = sin(s[2]/2);
-        point.pose.orientation.w = cos(s[2]/2);
-
-        gui_path.poses[i] = point;
-    }
-    display_trajectory_pub.publish(gui_path);
-    ros::spinOnce();
-    rate.sleep();
-    path.clear();
-    // Cleanup
-    if (world_model!=NULL)
-        delete world_model;
-        
-    if (planner_costmap_ros!=NULL)
-        delete planner_costmap_ros;
-
-    if (collision_costmap_ros!=NULL)
-        delete collision_costmap_ros;
-    // TODO: Delete this is causing some form of error
-    // delete planner_costmap_ros;    
-}
