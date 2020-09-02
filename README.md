@@ -1,4 +1,4 @@
-# DynamicMPNet-Documentation
+# DynamicMPNet
 
 This repository aims to document the setup and usage of the Dynamic MPNet Planner for the purpose of robot navigation.
 
