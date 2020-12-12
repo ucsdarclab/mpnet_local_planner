@@ -322,7 +322,6 @@ namespace mpnet_local_planner{
                 isGoalValid = pathToGoal.check();
                 if (isGoalValid)
                 {
-                    ROS_INFO("Valid path found");
                     FinalPathFromStart.append(goal_ompl());
                     break;
                 }
