@@ -28,7 +28,9 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL)
+    tc_(NULL),
+    dynmpnet_num(0),
+    rrtstar_num(0)
     // controller(false)
     {}
     
@@ -140,6 +142,7 @@ namespace mpnet_local_planner{
         plan_freq_count = 0;
         reached_goal_ = false;
         valid_local_path = false;
+        resetLog();
         return true;
     }
 
@@ -223,9 +226,10 @@ namespace mpnet_local_planner{
         double global_yaw = tf2::getYaw(global_pose.pose.orientation);
         double yaw_from_goal = angles::shortest_angular_distance(global_yaw, angle);
         // Check both xy distance and yaw difference for goal termination
-        if (fabs(yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance)
+        if (fabs((yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance) || reached_goal_) 
         {
             ROS_INFO("Reach Goal");
+            ROS_INFO("Number of RRT-star : %u Number of Dynamic MPnet : %u", dynmpnet_num, rrtstar_num);
             cmd_vel.linear.x = 0.0;
             cmd_vel.linear.y = 0.0;
             cmd_vel.angular.z = 0.0;
@@ -256,14 +260,14 @@ namespace mpnet_local_planner{
 
                 auto stop_time = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-                ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+                // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
                 // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
 
                 if (new_path.getPointsSize()>1) 
                 {
-                    ROS_INFO("Old path cost: %f , New path cost: %f",path.cost_, new_path.cost_);
-                    ROS_INFO("Distance from previous goal: %f", xydist_from_prev_goal);
-                    ROS_INFO("Yaw from previous goal: %f", yaw_from_prev_goal);
+                    // ROS_INFO("Old path cost: %f , New path cost: %f",path.cost_, new_path.cost_);
+                    // ROS_INFO("Distance from previous goal: %f", xydist_from_prev_goal);
+                    // ROS_INFO("Yaw from previous goal: %f", yaw_from_prev_goal);
                     // check if the path length of the new path is worse or better, if
                     // the new path plans for a path near the goal point
                     if(xydist_from_prev_goal>=0.01 || fabs(yaw_from_prev_goal)>=0.1)
@@ -271,16 +275,19 @@ namespace mpnet_local_planner{
                     else 
                     {
                         if(new_path.cost_<=path.cost_ || path.cost_<0)
+                        {
                             path = new_path;
+                            dynmpnet_num++;
+                        }
                     }
                     valid_local_path = true;
                 }
                 else
                 {
-                    ROS_INFO("Number of points in local path: %lud", local_plan.size());
-                    if (!local_plan.empty())
+                    // ROS_INFO("Number of points in local path: %lud", local_plan.size());
+                    if (local_plan.size()>50)
                         pruneLocalPlan(global_pose, local_plan);
-                    ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
+                    // ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
                     else
                     {
                         ROS_INFO("Looking for a new path");
@@ -290,6 +297,7 @@ namespace mpnet_local_planner{
                         {
                             ROS_INFO("Path from RRT star");
                             path = new_path;
+                            rrtstar_num++;
                             valid_local_path = true;
                         }
                         else
@@ -324,6 +332,9 @@ namespace mpnet_local_planner{
         }
         plan_freq_count++;
 
+
+        if (!local_plan.empty())
+            pruneLocalPlan(global_pose, local_plan);
         // Publish information to the visualizer
         base_local_planner::publishPlan(transformed_plan, g_plan_pub_);
         base_local_planner::publishPlan(local_plan, l_plan_pub_);
@@ -369,10 +380,15 @@ namespace mpnet_local_planner{
             const geometry_msgs::PoseStamped& w = *it;
             double distance_sq = distanceBetweenPoints(w, global_pose);
             if(distance_sq < 0.001){
-                ROS_INFO("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
+                // ROS_INFO("Nearest waypoint to <%f, %f> is <%f, %f>\n", global_pose.pose.position.x, global_pose.pose.position.y, w.pose.position.x, w.pose.position.y);
                 break;
             }
             it = plan.erase(it);
         }
+    }
+
+    void MpnetLocalPlanner::resetLog(){
+        dynmpnet_num = 0;
+        rrtstar_num = 0;
     }
 }

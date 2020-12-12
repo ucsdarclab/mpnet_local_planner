@@ -322,7 +322,6 @@ namespace mpnet_local_planner{
                 isGoalValid = pathToGoal.check();
                 if (isGoalValid)
                 {
-                    ROS_INFO("Valid path found");
                     FinalPathFromStart.append(goal_ompl());
                     break;
                 }
@@ -406,7 +405,7 @@ namespace mpnet_local_planner{
         ss.setPlanner(planAlgo);
         // std::cout << "The range of the planner : " << planAlgo->getRange();
 
-        ob::PlannerStatus solved = ss.solve(0.02);
+        ob::PlannerStatus solved = ss.solve(0.1);
         traj.resetPoints();
 
         if (ss.haveSolutionPath())
