@@ -36,6 +36,8 @@
     <rosparam file="$(find racecar_simulator)/params/local_costmap_param.yaml" command="load" />
     <rosparam file="$(find racecar_simulator)/params/global_costmap_param.yaml" command="load" /> 
     <rosparam file="$(find mpnet_plan)/params/collision_costmap_param.yaml" command="load" /> 
+    <param name="NavfnROS/allow_unknown" value="false"/>
+    <param name="global_costmap/obstacle_costmap/track_unknown_space" value="true"/>
     <param name="base_local_planner" value="mpnet_local_planner/MpnetLocalPlanner" />
     <param name="controller_frequency" value="20.0"/>
     <!-- <param name="controller_patience" value="15.0"/> -->
