@@ -28,7 +28,9 @@ namespace mpnet_local_planner{
     initialized_(false),
     navigation_costmap_ros_(NULL),
     odom_helper_("odom"),
-    tc_(NULL)
+    tc_(NULL),
+    dynmpnet_num(0),
+    rrtstar_num(0)
     // controller(false)
     {}
     
@@ -140,6 +142,7 @@ namespace mpnet_local_planner{
         plan_freq_count = 0;
         reached_goal_ = false;
         valid_local_path = false;
+        resetLog();
         return true;
     }
 
@@ -226,6 +229,7 @@ namespace mpnet_local_planner{
         if (fabs((yaw_from_goal)<=yaw_goal_tolerance && xydist_from_goal<=xy_goal_tolerance) || reached_goal_) 
         {
             ROS_INFO("Reach Goal");
+            ROS_INFO("Number of RRT-star : %u Number of Dynamic MPnet : %u", dynmpnet_num, rrtstar_num);
             cmd_vel.linear.x = 0.0;
             cmd_vel.linear.y = 0.0;
             cmd_vel.angular.z = 0.0;
@@ -271,7 +275,10 @@ namespace mpnet_local_planner{
                     else 
                     {
                         if(new_path.cost_<=path.cost_ || path.cost_<0)
+                        {
                             path = new_path;
+                            dynmpnet_num++;
+                        }
                     }
                     valid_local_path = true;
                 }
@@ -290,6 +297,7 @@ namespace mpnet_local_planner{
                         {
                             ROS_INFO("Path from RRT star");
                             path = new_path;
+                            rrtstar_num++;
                             valid_local_path = true;
                         }
                         else
@@ -377,5 +385,10 @@ namespace mpnet_local_planner{
             }
             it = plan.erase(it);
         }
+    }
+
+    void MpnetLocalPlanner::resetLog(){
+        dynmpnet_num = 0;
+        rrtstar_num = 0;
     }
 }

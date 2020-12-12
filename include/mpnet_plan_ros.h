@@ -102,6 +102,11 @@ namespace mpnet_local_planner{
             void pruneLocalPlan(const geometry_msgs::PoseStamped& global_pose, std::vector<geometry_msgs::PoseStamped>& plan);
 
             /**
+             * @brief A function to reset the logging paramters used in the function
+             */
+            void resetLog(); 
+
+            /**
              * Destructor for the interface
              */
             ~MpnetLocalPlanner();
@@ -136,5 +141,8 @@ namespace mpnet_local_planner{
             // Controller controller;
             OdometryHelperRos odom_helper_;
             int plan_freq, plan_freq_count;
+
+            // Parameters for LOGGING
+            int dynmpnet_num, rrtstar_num;
     };
 }
