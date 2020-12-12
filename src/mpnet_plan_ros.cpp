@@ -278,6 +278,7 @@ namespace mpnet_local_planner{
                 else
                 {
                     // ROS_INFO("Number of points in local path: %lud", local_plan.size());
+                    if (local_plan.size()>50)
                         pruneLocalPlan(global_pose, local_plan);
                     // ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
                     else
