@@ -7,12 +7,18 @@
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_1f_full_tuned_edit.yaml"/>-->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/ucsd_atkinson_6f_icra2019_fx_net.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2.yaml"/> -->
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_edit.yaml"/> -->
+
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_small.yaml"/> -->
-    <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06_small.yaml"/> -->
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/intel.yaml"/> -->
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06_small.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_0_06.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/unknown.yaml"/> -->
-  <!-- <arg name="map" default="$(find racecar_simulator)/maps/mymap2.yaml"/> -->
-  <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/>
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/unknown2.yaml"/> -->
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/grid_world_2_train2.yaml"/> -->
+
+  <arg name="map" default="$(find racecar_simulator)/maps/mymap2.yaml"/>
+  <!-- <arg name="map" default="$(find racecar_simulator)/maps/mymap.yaml"/> -->
   <!-- <arg name="map" default="$(find racecar_simulator)/maps/narrowPassage.yaml"/> -->
 
 
