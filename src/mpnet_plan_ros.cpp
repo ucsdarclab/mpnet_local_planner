@@ -256,14 +256,14 @@ namespace mpnet_local_planner{
 
                 auto stop_time = std::chrono::high_resolution_clock::now();
                 auto duration = std::chrono::duration_cast<std::chrono::microseconds>(stop_time - start_time);
-                ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
+                // ROS_INFO("Time taken to Plan : %ld microseconds", duration.count());
                 // ROS_INFO("Number of points in new path : %ud", new_path.getPointsSize());
 
                 if (new_path.getPointsSize()>1) 
                 {
-                    ROS_INFO("Old path cost: %f , New path cost: %f",path.cost_, new_path.cost_);
-                    ROS_INFO("Distance from previous goal: %f", xydist_from_prev_goal);
-                    ROS_INFO("Yaw from previous goal: %f", yaw_from_prev_goal);
+                    // ROS_INFO("Old path cost: %f , New path cost: %f",path.cost_, new_path.cost_);
+                    // ROS_INFO("Distance from previous goal: %f", xydist_from_prev_goal);
+                    // ROS_INFO("Yaw from previous goal: %f", yaw_from_prev_goal);
                     // check if the path length of the new path is worse or better, if
                     // the new path plans for a path near the goal point
                     if(xydist_from_prev_goal>=0.01 || fabs(yaw_from_prev_goal)>=0.1)
@@ -277,8 +277,7 @@ namespace mpnet_local_planner{
                 }
                 else
                 {
-                    ROS_INFO("Number of points in local path: %lud", local_plan.size());
-                    if (!local_plan.empty())
+                    // ROS_INFO("Number of points in local path: %lud", local_plan.size());
                         pruneLocalPlan(global_pose, local_plan);
                     // ROS_INFO("Number of points in local path after pruning: %lud", local_plan.size());
                     else
