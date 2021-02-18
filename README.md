@@ -8,8 +8,9 @@ The planner was tested on a Docker Container with the following specifications.
 
 1. ROS-Melodic
 2. LibTorch Build Version 1.5.1
-3. CUDA Version 10.2
-4. [mit-racecar simulator](https://github.com/jacobjj/racecar_simulator/tree/navigation)
+3. OMPL v1.4.2
+4. CUDA Version 10.2
+5. [mit-racecar simulator](https://github.com/jacobjj/racecar_simulator/tree/navigation)
    
 ## Package Installation
 Git clone the package your catkin workspace.
